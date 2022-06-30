@@ -1,0 +1,163 @@
+syntax = "proto3";
+
+package paranoid_crypto;
+
+// Next ID to use: 12
+enum OriginType {
+  ORIGIN_UNKNOWN = 0;
+  ORIGIN_OPTION_ROM = 1;
+  ORIGIN_SECURE_BOOT_DB = 2;
+  ORIGIN_SECURE_BOOT_KEK = 3;
+  ORIGIN_SECURE_BOOT_PK = 4;
+  ORIGIN_TPM_EC_EK = 5;
+  ORIGIN_TPM_RSA_AIK = 6;
+  ORIGIN_TPM_RSA_EK = 7;
+  ORIGIN_CT_EC = 8;
+  ORIGIN_CT_RSA = 9;
+  ORIGIN_KMS_EC = 10;
+  ORIGIN_KMS_RSA = 11;
+}
+
+// Next ID to use: 12
+enum SignatureAlgorithm {
+  ALGORITHM_UNKNOWN = 0;
+  RSA_WITH_MD5 = 1;
+  RSA_WITH_SHA1 = 2;
+  RSA_WITH_SHA224 = 3;
+  RSA_WITH_SHA256 = 4;
+  RSA_WITH_SHA384 = 5;
+  RSA_WITH_SHA512 = 6;
+  ECDSA_WITH_SHA1 = 7;
+  ECDSA_WITH_SHA224 = 8;
+  ECDSA_WITH_SHA256 = 9;
+  ECDSA_WITH_SHA384 = 10;
+  ECDSA_WITH_SHA512 = 11;
+  // TODO(pedroysb): Include more signature algorithms (e.g., RSA_WITH_MD4).
+}
+
+// Next ID to use: 20
+enum CurveType {
+  CURVE_UNKNOWN = 0;
+  CURVE_SECP192R1 = 1;
+  CURVE_SECP256R1 = 2;
+  CURVE_SECP224R1 = 3;
+  CURVE_SECP384R1 = 4;
+  CURVE_SECP521R1 = 5;
+  CURVE_SECP256K1 = 6;
+  CURVE_SECT163K1 = 7;
+  CURVE_SECT233K1 = 8;
+  CURVE_SECT283K1 = 9;
+  CURVE_SECT409K1 = 10;
+  CURVE_SECT571K1 = 11;
+  CURVE_SECT163R2 = 12;
+  CURVE_SECT233R1 = 13;
+  CURVE_SECT283R1 = 14;
+  CURVE_SECT409R1 = 15;
+  CURVE_SECT571R1 = 16;
+  CURVE_BRAINPOOLP256R1 = 17;
+  CURVE_BRAINPOOLP384R1 = 18;
+  CURVE_BRAINPOOLP512R1 = 19;
+}
+
+// Next ID to use: 5
+enum SeverityType {
+  SEVERITY_UNKNOWN = 0;
+  SEVERITY_LOW = 1;
+  SEVERITY_MEDIUM = 2;
+  SEVERITY_HIGH = 3;
+  SEVERITY_CRITICAL = 4;
+}
+
+message OriginInfo {
+  // The fingerprint (sha256) of the original raw_data.
+  bytes fingerprint = 1;
+  // Raw data where the signature/public key was extracted from (e.g., x509 DER
+  // cert.).
+  bytes raw_data = 2;
+  // Specifies the origin of the signature/key.
+  OriginType type = 3;
+}
+
+message RSASignatureInfo {
+  bytes s = 1;
+  string issuer = 2;
+  SignatureAlgorithm algorithm = 3;
+  // Full hash of the message (i.e., not truncated).
+  bytes message_hash = 4;
+}
+
+message ECDSASignatureInfo {
+  bytes r = 1;
+  bytes s = 2;
+  string issuer = 3;
+  SignatureAlgorithm algorithm = 4;
+  // Full hash of the message (i.e., not truncated).
+  bytes message_hash = 5;
+}
+
+message RSAKeyInfo {
+  bytes n = 1;
+  bytes e = 2;
+}
+
+message ECKeyInfo {
+  CurveType curve_type = 1;
+  bytes x = 2;
+  bytes y = 3;
+}
+
+// E.g., Test results.
+message TestResultsEntry {
+  // Test name, e.g., 'CheckROCA', 'CheckGCD', ...
+  string test_name = 1;
+  // Test result i.e., True if vulnerable, False otherwise.
+  bool result = 2;
+  // Specifies the serverity of the test.
+  SeverityType severity = 3;
+}
+
+// E.g., Attached test logs/outputs, e.g., a factor, partial info of a factor
+// or other values specified by researchers.
+message AttachedInfoEntry {
+  string info_name = 1;
+  string value = 2;
+}
+
+// Contains test results for the specific key/signature.
+message TestInfo {
+  // Specifies if the key/signature failed in any of the tests.
+  bool weak = 1;
+
+  repeated TestResultsEntry test_results = 3;
+  repeated AttachedInfoEntry attached_info = 4;
+
+  // Specifies the lib build version that ran the tests.
+  int32 paranoid_lib_version = 5;
+}
+
+// The messages below are intended to be used in code level.
+message RSASignature {
+  OriginInfo origin_info = 1;
+  RSASignatureInfo rsa_sig_info = 2;
+  TestInfo test_info = 3;
+  RSAKeyInfo issuer_key_info = 4;
+}
+
+message ECDSASignature {
+  OriginInfo origin_info = 1;
+  ECDSASignatureInfo ecdsa_sig_info = 2;
+  TestInfo test_info = 3;
+  ECKeyInfo issuer_key_info = 4;
+}
+
+message RSAKey {
+  OriginInfo origin_info = 1;
+  RSAKeyInfo rsa_info = 2;
+  TestInfo test_info = 3;
+}
+
+message ECKey {
+  OriginInfo origin_info = 1;
+  ECKeyInfo ec_info = 2;
+  TestInfo test_info = 3;
+}

@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package paranoid_crypto.lib.data;
+
+// Data used on CheckKeypairDenylist for detecting RSA keys vulnerable to
+// CVE-2021-41117. The table field is a map of the 64 most significant bits
+// of the modulus into metadata with enough information for reconstructing the
+// primes. See GetKeyPairTable method in storage.py and default_storage.py for
+// more details.
+message KeypairData {
+  map<uint64, bytes> table = 1;
+}
