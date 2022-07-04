@@ -11,18 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""This module contains the main function for the test suites.
+"""This module contains an example for the randomness test suites.
 
-The individual tests are implemented in random_test_suite.
+The individual tests are implemented in paranoid_crypto/lib/randomness_tests.
 This module is essentially just one way to call these tests.
 It assumes that a large number of bytes of a random number generator
-are available for testing.
+are available for testing. Many examples of pseudorandom number generators are
+implemented at paranoid_crypto/lib/randomness_tests/rng.py for testing purposes.
 """
 
 import cProfile
 from absl import app
 from absl import flags
-from absl import logging
 from paranoid_crypto.lib.randomness_tests import random_test_suite
 from paranoid_crypto.lib.randomness_tests import rng
 
@@ -77,36 +77,36 @@ def test_sources() -> None:
 
 # Sample output for 100 MB
 # ------------------------
-# blaze run -c opt demo -- --source=urandom --size=800000000
+# $ python3 randomness.py --source=urandom --size=800000000
 #
 # -------- Testing: urandom --------
 # number of bits: 800000000
-# Frequency                      passed: p=0.537314        (0.05s)
-# BlockFrequency                 passed: p=0.075785        (0.31s)
-# Runs                           passed: p=0.482132        (0.17s)
-# LongestRuns                    passed: p=0.268165        (0.66s)
-# BinaryMatrixRank               passed: p=0.543245        (52.67s)
-# Spectral                       passed: p=0.271534        (129.55s)
-# OverlappingTemplateMatching    passed: p=0.125318        (1.90s)
-# Universal                      passed: p=0.259407        (102.22s)
-# LinearComplexity [512]         passed: 2                 (6.97s)
-# LinearComplexity [1024]        passed: 2                 (5.93s)
-# LinearComplexity [2048]        passed: 2                 (5.55s)
-# LinearComplexity [4096]        passed: 2                 (6.68s)
-# Serial                         passed: 42                (64.01s)
-# ApproximateEntropy             passed: 19                (57.16s)
-# RandomWalk                     passed: 28                (68.52s)
-# LargeBinaryMatrixRank          passed: 9                 (8.49s)
-# LinearComplexityScatter [32, 100000] passed: p=0.859695        (0.19s)
-# LinearComplexityScatter [64, 50000] passed: p=0.846455        (0.11s)
-# LinearComplexityScatter [128, 40000] passed: p=0.904050        (0.16s)
-# FindBias [256]                 passed: p=0.474528        (5.11s)
-# FindBias [384]                 passed: p=0.985698        (5.87s)
-# FindBias [512]                 passed: p=0.086568        (7.98s)
-# FindBias [1024]                passed: p=0.239451        (18.21s)
-# NonOverlappingTemplateMatching passed: 284               (33.20s)
+# Frequency                      passed: p=0.412682        (0.07s)
+# BlockFrequency                 passed: p=0.867963        (0.31s)
+# Runs                           passed: p=0.790792        (0.25s)
+# LongestRuns                    passed: p=0.167829        (0.90s)
+# BinaryMatrixRank               passed: p=0.588735        (47.33s)
+# Spectral                       passed: p=0.435987        (139.89s)
+# OverlappingTemplateMatching    passed: p=0.887825        (1.70s)
+# Universal                      passed: p=0.521065        (76.87s)
+# LinearComplexity [512]         passed: 2                 (6.26s)
+# LinearComplexity [1024]        passed: 2                 (5.50s)
+# LinearComplexity [2048]        passed: 2                 (5.45s)
+# LinearComplexity [4096]        passed: 2                 (5.88s)
+# Serial                         passed: 42                (56.06s)
+# ApproximateEntropy             passed: 19                (49.62s)
+# RandomWalk                     passed: 28                (67.00s)
+# LargeBinaryMatrixRank          passed: 9                 (7.54s)
+# LinearComplexityScatter [32, 100000] passed: p=0.450327        (0.17s)
+# LinearComplexityScatter [64, 50000] passed: p=0.640746        (0.10s)
+# LinearComplexityScatter [128, 40000] passed: p=0.165547        (0.15s)
+# FindBias [256]                 passed: p=0.818161        (5.23s)
+# FindBias [384]                 passed: p=0.156196        (6.12s)
+# FindBias [512]                 passed: p=0.218308        (9.21s)
+# FindBias [1024]                passed: p=0.122032        (20.61s)
+# NonOverlappingTemplateMatching passed: 284               (31.57s)
 # passed    : 405/405
-# total time: 615.81s
+# total time: 575.29s
 
 
 def main(argv: list[str]) -> None:
@@ -115,7 +115,6 @@ def main(argv: list[str]) -> None:
   Args:
     argv: command line arguments.
   """
-  logging.use_python_logging()
   if len(argv) > 1:
     raise app.UsageError("Too many commandline arguments.")
   if _PROF.value:
