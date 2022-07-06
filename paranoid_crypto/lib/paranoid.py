@@ -17,7 +17,10 @@ The library tests the input public keys/signatures (e.g, RSA and ECC) for known
 weaknesses. It does pure math verifications and can be used for in a pipeline.
 """
 import collections
+import enum
+import time
 from typing import List, Dict
+from absl import logging
 from paranoid_crypto import paranoid_pb2
 from paranoid_crypto.lib import base_check
 from paranoid_crypto.lib import ec_aggregate_checks
@@ -134,52 +137,101 @@ def GetECDSAAllChecks() -> Dict[str, base_check.BaseCheck]:
   return _check_factory[_ECDSA_ALL]
 
 
-def CheckAllRSA(rsa_keys: List[paranoid_pb2.RSAKey]) -> bool:
+class _State(enum.Enum):
+  """Defines the state of a check against a group of keys."""
+  PASSED = 1
+  FAILED = 2
+
+
+def _CheckArtifacts(artifacts: base_check.ArtifactListType,
+                    check_items: list[tuple[str, base_check.BaseCheck]],
+                    log_level: int) -> bool:
+  """Generic function for testing artifacts.
+
+  Args:
+    artifacts: list of artifacts of the same type (e.g., a list of RSA public
+      keys or a list of ECDSA signatures).
+    check_items: list of tuples. Each tuple contains the name of the check and a
+      BaseCheck instance that contains a Check method.
+    log_level: 0: only prints existing logging of the library
+               1: prints additional info stats about the checks
+
+  Returns:
+    Whether at least one of the artifacts is potentially weak.
+  """
+  any_weak = False
+  start_total = time.time()
+  for name, check in check_items:
+    start = time.time()
+    res = check.Check(artifacts)
+    if log_level >= 1:
+      state = _State.FAILED.name.lower() if res else _State.PASSED.name.lower()
+      logging.info("%-30s %-22s    (%4.2fs)", name, state, time.time() - start)
+    any_weak |= res
+
+  if log_level >= 1:
+    if any_weak:
+      final_state = _State.FAILED.name.lower()
+    else:
+      final_state = _State.PASSED.name.lower()
+    logging.info("final state: %s", final_state)
+    logging.info("total time: %4.2fs", time.time() - start_total)
+  return any_weak
+
+
+def CheckAllRSA(rsa_keys: List[paranoid_pb2.RSAKey],
+                log_level: int = 0) -> bool:
   """Runs all checks on the RSA input keys.
 
   Args:
     rsa_keys: RSA public keys. Each public key is a paranoid_pb2.RSAKey protobuf
       with at least the following attributes: rsa_info.n: The RSA modulus;
       rsa_info.e: The RSA exponent.
+    log_level: 0: only prints existing logging of the library
+               1: prints additional info stats about the checks
 
   Returns:
-    Whether at least one of the keys is weak.
+    Whether at least one of the keys is potentially weak.
   """
-  any_weak = False
-  for _, check in GetRSAAllChecks().items():
-    any_weak |= check.Check(rsa_keys)
-  return any_weak
+  if log_level >= 1:
+    logging.info("-------- Testing %d RSA keys --------", len(rsa_keys))
+  return _CheckArtifacts(rsa_keys, list(GetRSAAllChecks().items()), log_level)
 
 
-def CheckAllEC(ec_keys: List[paranoid_pb2.ECKey]) -> bool:
+def CheckAllEC(ec_keys: List[paranoid_pb2.ECKey], log_level: int = 0) -> bool:
   """Runs all checks on the EC input keys.
 
   Args:
     ec_keys: A list of EC public keys. Each public key is a paranoid_pb2.ECKey
       protobuf with at least the following attributes: ec_info.curve_type: the
       curve used; ec_info.x: the x-coordinate; ec_info.y: the y-coordinate.
+    log_level: 0: only prints existing logging of the library
+               1: prints additional info stats about the checks
 
   Returns:
-    Whether at least one of the keys is weak.
+    Whether at least one of the keys is potentially weak.
   """
-  any_weak = False
-  for _, check in GetECAllChecks().items():
-    any_weak |= check.Check(ec_keys)
-  return any_weak
+  if log_level >= 1:
+    logging.info("-------- Testing %d EC keys --------", len(ec_keys))
+  return _CheckArtifacts(ec_keys, list(GetECAllChecks().items()), log_level)
 
 
-def CheckAllECDSASigs(ecdsa_sigs: List[paranoid_pb2.ECDSASignature]) -> bool:
+def CheckAllECDSASigs(ecdsa_sigs: List[paranoid_pb2.ECDSASignature],
+                      log_level: int = 0) -> bool:
   """Runs all checks on the ECDSA signatures.
 
   Args:
     ecdsa_sigs: A list of ECDSA signatures. Each signature is a
       paranoid_pb2.ECDSASignature protobuf with at least all the attributes of
       ecdsa_sig_info set.
+    log_level: 0: only prints existing logging of the library
+               1: prints additional info stats about the checks
 
   Returns:
-    Whether at least one of the signatures is weak.
+    Whether at least one of the signatures is potentially weak.
   """
-  any_weak = False
-  for _, check in GetECDSAAllChecks().items():
-    any_weak |= check.Check(ecdsa_sigs)
-  return any_weak
+  if log_level >= 1:
+    logging.info("-------- Testing %d ECDSA signatures --------",
+                 len(ecdsa_sigs))
+  return _CheckArtifacts(ecdsa_sigs, list(GetECDSAAllChecks().items()),
+                         log_level)
