@@ -15,7 +15,7 @@
 
 import hashlib
 import math
-from typing import List, Optional
+from typing import Optional
 from absl import logging
 import gmpy
 from paranoid_crypto import paranoid_pb2
@@ -37,7 +37,7 @@ class CheckSizes(base_check.BaseCheck):
   def __init__(self):
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_MEDIUM)
 
-  def Check(self, artifacts: List[paranoid_pb2.RSAKey]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
     any_weak = False
     for key in artifacts:
       test_result = self._CreateTestResult()
@@ -58,7 +58,7 @@ class CheckExponents(base_check.BaseCheck):
   def __init__(self):
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_MEDIUM)
 
-  def Check(self, artifacts: List[paranoid_pb2.RSAKey]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
     any_weak = False
     for key in artifacts:
       test_result = self._CreateTestResult()
@@ -83,7 +83,7 @@ class CheckROCA(base_check.BaseCheck):
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_HIGH)
     self._fc = roca.ROCAKeyDetector()
 
-  def Check(self, artifacts: List[paranoid_pb2.RSAKey]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
     any_weak = False
     for key in artifacts:
       test_result = self._CreateTestResult()
@@ -108,7 +108,7 @@ class CheckROCAVariant(base_check.BaseCheck):
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_MEDIUM)
     self._fcv = roca.ROCAKeyVariantDetector()
 
-  def Check(self, artifacts: List[paranoid_pb2.RSAKey]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
     any_weak = False
     for key in artifacts:
       test_result = self._CreateTestResult()
@@ -133,7 +133,7 @@ class CheckFermat(base_check.BaseCheck):
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_CRITICAL)
     self._max_steps = max_steps
 
-  def Check(self, artifacts: List[paranoid_pb2.RSAKey]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
     any_weak = False
     for key in artifacts:
       test_result = self._CreateTestResult()
@@ -162,7 +162,7 @@ class CheckHighAndLowBitsEqual(base_check.BaseCheck):
   def __init__(self):
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_CRITICAL)
 
-  def Check(self, artifacts: List[paranoid_pb2.RSAKey]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
     any_weak = False
     for key in artifacts:
       test_result = self._CreateTestResult()
@@ -191,7 +191,7 @@ class CheckOpensslDenylist(base_check.BaseCheck):
     self._storage = paranoid_storage or default_storage.DefaultStorage()
     self._weak_keylist = self._storage.GetOpensslDenylist()
 
-  def Check(self, artifacts: List[paranoid_pb2.RSAKey]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
     any_weak = False
     for key in artifacts:
       test_result = self._CreateTestResult()
@@ -224,7 +224,7 @@ class CheckContinuedFractions(base_check.BaseCheck):
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_CRITICAL)
     self._bound = bound
 
-  def Check(self, artifacts: List[paranoid_pb2.RSAKey]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
     any_weak = False
     for key in artifacts:
       test_result = self._CreateTestResult()
@@ -257,7 +257,7 @@ class CheckBitPatterns(base_check.BaseCheck):
   n.bit_length() // 8, but not longer.
   """
 
-  def __init__(self, pattern_sizes: Optional[List[int]] = None):
+  def __init__(self, pattern_sizes: Optional[list[int]] = None):
     """CheckBitPatterns check constructor.
 
     Args:
@@ -268,7 +268,7 @@ class CheckBitPatterns(base_check.BaseCheck):
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_CRITICAL)
     self._pattern_sizes = pattern_sizes
 
-  def Check(self, artifacts: List[paranoid_pb2.RSAKey]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
     any_weak = False
     pattern_sizes = self._pattern_sizes
     if pattern_sizes is None:
@@ -365,7 +365,7 @@ class CheckPermutedBitPatterns(base_check.BaseCheck):
   def __init__(self):
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_CRITICAL)
 
-  def Check(self, artifacts: List[paranoid_pb2.RSAKey]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
     any_weak = False
     for key in artifacts:
       test_result = self._CreateTestResult()
@@ -423,7 +423,7 @@ class CheckPollardpm1(base_check.BaseCheck):
         powers[i] = powers[i]**int(math.log(powersmooth, powers[i]))
       self._m = ntheory_util.FastProduct(powers)
 
-  def Check(self, artifacts: List[paranoid_pb2.RSAKey]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
     any_weak = False
     for key in artifacts:
       test_result = self._CreateTestResult()
@@ -449,7 +449,7 @@ class CheckLowHammingWeight(base_check.BaseCheck):
   def __init__(self):
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_CRITICAL)
 
-  def Check(self, artifacts: List[paranoid_pb2.RSAKey]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
     any_weak = False
     for key in artifacts:
       test_result = self._CreateTestResult()
@@ -487,7 +487,7 @@ class CheckUnseededRand(base_check.BaseCheck):
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_CRITICAL)
     self._storage = paranoid_storage or default_storage.DefaultStorage()
 
-  def Check(self, artifacts: List[paranoid_pb2.RSAKey]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
     any_weak = False
     for key in artifacts:
       n = gmpy.mpz(util.Bytes2Int(key.rsa_info.n))
@@ -521,7 +521,7 @@ class CheckSmallUpperDifferences(base_check.BaseCheck):
   def __init__(self):
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_CRITICAL)
 
-  def Check(self, artifacts: List[paranoid_pb2.RSAKey]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
     any_weak = False
     for key in artifacts:
       test_result = self._CreateTestResult()
@@ -557,7 +557,7 @@ class CheckKeypairDenylist(base_check.BaseCheck):
     self._storage = paranoid_storage or default_storage.DefaultStorage()
     self._table = dict(self._storage.GetKeypairData().table)
 
-  def Check(self, artifacts: List[paranoid_pb2.RSAKey]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
     any_weak = False
     for key in artifacts:
       test_result = self._CreateTestResult()

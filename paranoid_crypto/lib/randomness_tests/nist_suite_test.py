@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List
 from absl.testing import absltest
 from paranoid_crypto.lib.randomness_tests import exp1
 from paranoid_crypto.lib.randomness_tests import nist_suite
@@ -35,7 +34,7 @@ def BitString(bit_string: str) -> int:
   return int(bit_string[::-1], 2)
 
 
-def BitStrings(bit_strings: List[str]) -> List[int]:
+def BitStrings(bit_strings: list[str]) -> list[int]:
   return [BitString(s) for s in bit_strings]
 
 

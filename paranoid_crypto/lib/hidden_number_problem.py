@@ -25,8 +25,9 @@ are chosen in a non-uniform manner. In particular, we use the formulation of
 a hidden number problem above, because it simplifies analyzing ECDSA signatures.
 """
 
+from collections.abc import Iterator
 import enum
-from typing import Generator, List, Tuple, Optional
+from typing import Optional
 
 import gmpy
 
@@ -87,7 +88,7 @@ class SearchStrategy(enum.Flag):
   DEFAULT = SINGLE | SLIDING | INCLUDE_KEY
 
 
-def GetLattice(a: List[int], b: List[int], w: Optional[int], n: int,
+def GetLattice(a: list[int], b: list[int], w: Optional[int], n: int,
                bias: Bias):
   """Returns a lattice for a hidden number problem.
 
@@ -209,7 +210,7 @@ def GetLattice(a: List[int], b: List[int], w: Optional[int], n: int,
   return lat
 
 
-def HiddenNumberProblem(a: List[int], b: List[int], w: Optional[int], n: int,
+def HiddenNumberProblem(a: list[int], b: list[int], w: Optional[int], n: int,
                         bias: Bias):
   """Solves a hidden number problem.
 
@@ -239,9 +240,9 @@ def HiddenNumberProblem(a: List[int], b: List[int], w: Optional[int], n: int,
   return list(guesses)
 
 
-def HiddenNumberProblemWithPrecomputation(a: List[int], b: List[int], n: int,
-                                          constants: List[Tuple[int, int]],
-                                          w: int) -> List[int]:
+def HiddenNumberProblemWithPrecomputation(a: list[int], b: list[int], n: int,
+                                          constants: list[tuple[int, int]],
+                                          w: int) -> list[int]:
   """Tries to solve a hidden number problem with precomputed constants.
 
   This function tries to find an integer x, such that all values
@@ -302,10 +303,9 @@ def HiddenNumberProblemWithPrecomputation(a: List[int], b: List[int], n: int,
 
 
 def _HiddenNumberProblemSubsets(
-    a: List[int], b: List[int], curve_type: paranoid_pb2.CurveType,
+    a: list[int], b: list[int], curve_type: paranoid_pb2.CurveType,
     lcg: Optional[lcg_constants.LcgName], flags: SearchStrategy
-) -> Generator[Tuple[List[int], List[int], List[Tuple[int, int]], int], None,
-               None]:
+) -> Iterator[tuple[list[int], list[int], list[tuple[int, int]], int]]:
   """Yields subsets for the hidden number problem.
 
   This is just a helper function for HiddenNumberProblemForCurve.
@@ -369,10 +369,10 @@ def _HiddenNumberProblemSubsets(
       continue
 
 
-def HiddenNumberProblemForCurve(a: List[int], b: List[int],
+def HiddenNumberProblemForCurve(a: list[int], b: list[int],
                                 curve_type: paranoid_pb2.CurveType,
                                 lcg: Optional[lcg_constants.LcgName],
-                                flags: SearchStrategy) -> List[int]:
+                                flags: SearchStrategy) -> list[int]:
   """Attempts to detect ECDSA signatures for a given curve.
 
   This function tries to find the private key used to generate

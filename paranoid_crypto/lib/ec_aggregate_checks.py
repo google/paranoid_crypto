@@ -13,7 +13,6 @@
 # limitations under the License.
 """Module containing Paranoid checks on group of EC keys by aggregation."""
 
-from typing import List
 from absl import logging
 from paranoid_crypto import paranoid_pb2
 from paranoid_crypto.lib import base_check
@@ -39,7 +38,7 @@ class CheckECKeySmallDifference(base_check.BaseCheck):
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_HIGH)
     self._max_diff = max_diff
 
-  def Check(self, artifacts: List[paranoid_pb2.ECKey]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.ECKey]) -> bool:
     any_weak = False
     for curve_id, curve in ec_util.CURVE_FACTORY.items():
       if curve is None:

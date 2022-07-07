@@ -13,31 +13,32 @@
 # limitations under the License.
 """Test for paranoid_crypto.lib.hidden_number_problem."""
 
-from typing import Any, Dict, Optional
+from typing import Optional, TypedDict
 from absl.testing import absltest
 from paranoid_crypto import paranoid_pb2
 from paranoid_crypto.lib import ec_util
 from paranoid_crypto.lib import hidden_number_problem
 from paranoid_crypto.lib import lcg_constants
 
+
 # Type hint for samples with ECDSA signatures.
-# NOTE(bleichen): python 3.8 will allow to specify the type of samples as
-# class Signature(TypedDict):
-#   r: int
-#   s: int
-#   digest: str  # hexadecimal representation of the hash of the message
-#
-# class EcdsaSample(TypedDict, total=False):
-#   curve: paranoid_pb2.CurveType  # The name of the curve e.g. "secp256r1"
-#   priv: int   # The private key
-#   signatures: list[Signature]
-#
-EcdsaSample = Dict[str, Any]
+class Signature(TypedDict):
+  r: int
+  s: int
+  digest: str  # hexadecimal representation of the hash of the message
+
+
+class EcdsaSample(TypedDict, total=False):
+  curve: "paranoid_pb2.CurveType"  # The name of the curve e.g. "secp256r1"
+  priv: int  # The private key
+  normalized: bool
+  signatures: list[Signature]
+
 
 # Sample with ECDSA signatures where the 8 most significant bits of k are 0.
 # Bias.COMMON_PREFIX needs 36-39 signatures to find the private key.
 # All other strategies fail.
-SAMPLE_SECP256R1_8 = {
+SAMPLE_SECP256R1_8: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     "priv":
@@ -368,7 +369,7 @@ SAMPLE_SECP256R1_8 = {
 
 # Sample with ECDSA signatures where the 8 most significant bits of k are equal.
 # Bias.COMMON_PREFIX requires 36-39 signatures to find the private key.
-SAMPLE_SECP256R1_WITH_OFFSET_8 = {
+SAMPLE_SECP256R1_WITH_OFFSET_8: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     "priv":
@@ -699,7 +700,7 @@ SAMPLE_SECP256R1_WITH_OFFSET_8 = {
 
 # A sample with ECDSA signatures where the 16 most significant bits of k are 0.
 # Bias.MSB and Bias.COMMON_PREFIX find the private key from 18 signatures.
-SAMPLE_SECP256R1_16 = {
+SAMPLE_SECP256R1_16: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     "priv":
@@ -854,7 +855,7 @@ SAMPLE_SECP256R1_16 = {
 
 # Sample of ECDSA signatures where the 16 most significant bits of k are equal.
 # Bias.COMMON_PREFIX should find the private key with 18 signatures.
-SAMPLE_SECP256R1_WITH_OFFSET_16 = {
+SAMPLE_SECP256R1_WITH_OFFSET_16: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     "priv":
@@ -1009,7 +1010,7 @@ SAMPLE_SECP256R1_WITH_OFFSET_16 = {
 
 # Sample with ECDSA signatures where the 32 most significant bits of k are 0.
 # Bias.MSB should find the private key with 8 signatures.
-SAMPLE_SECP256R1_32 = {
+SAMPLE_SECP256R1_32: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     "priv":
@@ -1100,7 +1101,7 @@ SAMPLE_SECP256R1_32 = {
 
 # Sample with ECDSA signatures where bits 96 to 159 of k are 0.
 # Bias.GENERALIZED should find the private key with 18 signatures.
-SAMPLE_SECP256R1_ZEROS_96_160 = {
+SAMPLE_SECP256R1_ZEROS_96_160: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     "priv":
@@ -1298,7 +1299,7 @@ SAMPLE_SECP256R1_ZEROS_96_160 = {
 # The generalized method can solve some small instances. E.g., if the set S
 # has size 20 then about 49 signatures are sufficient to find the private
 # key. If S has size 32 then about 99 signatures are necessary.
-SAMPLE_SUBSETSUM_20_SECP256R1 = {
+SAMPLE_SUBSETSUM_20_SECP256R1: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     "priv":
@@ -1659,7 +1660,7 @@ SAMPLE_SUBSETSUM_20_SECP256R1 = {
 # Sample with signatures generated with a LCG using
 # s_n+1 = 1103515245 * s_n + 12345 % 2^31
 # Bias.GENERALIZED find the key with 20 or 21 signatures.
-SAMPLE_SECP256R1_GLIBC = {
+SAMPLE_SECP256R1_GLIBC: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     "priv":
@@ -1839,7 +1840,7 @@ SAMPLE_SECP256R1_GLIBC = {
 # ECDSA signatures using a LCG from numerical recipes.
 # This LCG uses s_n+1 = 1664525 * s_n + 1013904223 % 2 ^ 32.
 # Bias.GENERALIZED should be able to find the key from 19-20 signatures.
-SAMPLE_SECP256R1_NUMERICAL_RECIPES = {
+SAMPLE_SECP256R1_NUMERICAL_RECIPES: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     "priv":
@@ -2011,7 +2012,7 @@ SAMPLE_SECP256R1_NUMERICAL_RECIPES = {
 # Signatures generated with the POSIX LCG.
 # This LCG uses s_n+1 = 25214903917 * s_n + 11 % 2**48.
 # Bias.GENERALIZED should find the private key with 15-16 signatures.
-SAMPLE_SECP256R1_POSIX = {
+SAMPLE_SECP256R1_POSIX: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     "priv":
@@ -2152,7 +2153,7 @@ SAMPLE_SECP256R1_POSIX = {
 # This LCG uses the sequence s_n+1 = 25214903917 * s_n + 11 % 2**48.
 # The output that is used are the 32 most significant bits of s_n+1.
 # Bias.GENERALIZED should find the private key with 24 signatures.
-SAMPLE_SECP256R1_POSIX_TRUNCATED = {
+SAMPLE_SECP256R1_POSIX_TRUNCATED: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     "priv":
@@ -2364,7 +2365,7 @@ SAMPLE_SECP256R1_POSIX_TRUNCATED = {
 # Sample with ECDSA signatures using the MMIX LCG
 # This LCG uses: s_n+1 = 6364136223846793005 * s_n + 1442695040858963407 % 2^64.
 # Bias.GENERALIZED should be able to find the private key with 12-14 signatures.
-SAMPLE_SECP256R1_MMIX = {
+SAMPLE_SECP256R1_MMIX: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     "priv":
@@ -2498,7 +2499,7 @@ SAMPLE_SECP256R1_MMIX = {
 #   s_n+1 = 6364136223846793005 * s_n + 1442695040858963407 % 2^64,
 #   and then uses (s_n+1 >> 32)
 # Bias.GENERALIZED should be able to find the private key with 26 signatures.
-SAMPLE_SECP256R1_NEWLIB = {
+SAMPLE_SECP256R1_NEWLIB: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     "priv":
@@ -2737,7 +2738,7 @@ SAMPLE_SECP256R1_NEWLIB = {
 # code that finds the key with just 2 signatures. However, the test case here
 # does not know anything about the weakness. Thus the method here would
 # hopefully discover similar weaknesses as well.
-SAMPLE_SECP256R1_U2F = {
+SAMPLE_SECP256R1_U2F: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     "priv":
@@ -2949,7 +2950,7 @@ SAMPLE_SECP256R1_U2F = {
 # Sample of ECDSA signatures with the Cr50 U2F weakness, but only in the most
 # significant word.
 # Bias.GENERALIZED should find the private key with 23-27 signatures.
-SAMPLE_SECP256R1_U2F_MOST_SIGNIFICANT_WORD = {
+SAMPLE_SECP256R1_U2F_MOST_SIGNIFICANT_WORD: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     "priv":
@@ -3174,7 +3175,7 @@ SAMPLE_SECP256R1_U2F_MOST_SIGNIFICANT_WORD = {
     ]
 }
 
-SAMPLE_SECP256R1_GMP64_32 = {
+SAMPLE_SECP256R1_GMP64_32: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     "priv":
@@ -3532,7 +3533,7 @@ SAMPLE_SECP256R1_GMP64_32 = {
     }]
 }
 
-SAMPLE_SECP384R1_GMP64_32 = {
+SAMPLE_SECP384R1_GMP64_32: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP384R1,
     "priv":
@@ -3890,7 +3891,7 @@ SAMPLE_SECP384R1_GMP64_32 = {
     }]
 }
 
-SAMPLE_SECP521R1_GMP64_32 = {
+SAMPLE_SECP521R1_GMP64_32: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP521R1,
     "priv":
@@ -4248,7 +4249,7 @@ SAMPLE_SECP521R1_GMP64_32 = {
     }]
 }
 
-SAMPLE_SECP256R1_GMP128_64 = {
+SAMPLE_SECP256R1_GMP128_64: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     "priv":
@@ -4606,7 +4607,7 @@ SAMPLE_SECP256R1_GMP128_64 = {
     }]
 }
 
-SAMPLE_SECP384R1_GMP128_64 = {
+SAMPLE_SECP384R1_GMP128_64: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP384R1,
     "priv":
@@ -4964,7 +4965,7 @@ SAMPLE_SECP384R1_GMP128_64 = {
     }]
 }
 
-SAMPLE_SECP521R1_GMP128_64 = {
+SAMPLE_SECP521R1_GMP128_64: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP521R1,
     "priv":
@@ -5322,7 +5323,7 @@ SAMPLE_SECP521R1_GMP128_64 = {
     }]
 }
 
-SAMPLE_SECP256R1_GMP200_100 = {
+SAMPLE_SECP256R1_GMP200_100: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     "priv":
@@ -5680,7 +5681,7 @@ SAMPLE_SECP256R1_GMP200_100 = {
     }]
 }
 
-SAMPLE_SECP384R1_GMP200_100 = {
+SAMPLE_SECP384R1_GMP200_100: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP384R1,
     "priv":
@@ -6038,7 +6039,7 @@ SAMPLE_SECP384R1_GMP200_100 = {
     }]
 }
 
-SAMPLE_SECP521R1_GMP200_100 = {
+SAMPLE_SECP521R1_GMP200_100: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP521R1,
     "priv":
@@ -6396,7 +6397,7 @@ SAMPLE_SECP521R1_GMP200_100 = {
     }]
 }
 
-SAMPLE_SECP384R1_GMP256_128 = {
+SAMPLE_SECP384R1_GMP256_128: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP384R1,
     "priv":
@@ -6754,7 +6755,7 @@ SAMPLE_SECP384R1_GMP256_128 = {
     }]
 }
 
-SAMPLE_SECP521R1_GMP256_128 = {
+SAMPLE_SECP521R1_GMP256_128: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP521R1,
     "priv":
@@ -7112,7 +7113,7 @@ SAMPLE_SECP521R1_GMP256_128 = {
     }]
 }
 
-SAMPLE_SECP256R1_JAVA_UTIL_RANDOM = {
+SAMPLE_SECP256R1_JAVA_UTIL_RANDOM: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     "priv":
@@ -7323,7 +7324,7 @@ SAMPLE_SECP256R1_JAVA_UTIL_RANDOM = {
     ]
 }
 
-SAMPLE_SECP256K1_JAVA_UTIL_RANDOM = {
+SAMPLE_SECP256K1_JAVA_UTIL_RANDOM: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP256K1,
     "priv":
@@ -7536,7 +7537,7 @@ SAMPLE_SECP256K1_JAVA_UTIL_RANDOM = {
 
 # Contains 3 consecutive signatures generated with GMP's 128 bit LCG.
 # The other signatures are invalid.
-SAMPLE_SECP256R1_GMP128_64_SUBSET = {
+SAMPLE_SECP256R1_GMP128_64_SUBSET: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     "priv":
@@ -7580,7 +7581,7 @@ SAMPLE_SECP256R1_GMP128_64_SUBSET = {
 }
 
 # A sample with 3 consecutive signatures generated with java.util.random.
-SAMPLE_SECP256R1_JAVA_UTIL_RANDOM_SUBSET = {
+SAMPLE_SECP256R1_JAVA_UTIL_RANDOM_SUBSET: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     "priv":

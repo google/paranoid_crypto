@@ -13,11 +13,10 @@
 # limitations under the License.
 """Wrapper around fpylll."""
 
-from typing import List
 import fpylll
 
 
-def reduce(matrix: List[List[int]]) -> List[List[int]]:
+def reduce(matrix: list[list[int]]) -> list[list[int]]:
   """Performs a lattice reduction.
 
   This function calls LLL to find a reduce basis of the input.

@@ -14,12 +14,12 @@
 """This module implements the tests based on lattice basis reduction."""
 
 import math
-from typing import List, Optional, Tuple
+from typing import Optional
 from paranoid_crypto.lib import lll
 from paranoid_crypto.lib.randomness_tests import util
 
 
-def Bias(sample: List[int], n: int, transforms: List[Tuple[int, int]]) -> float:
+def Bias(sample: list[int], n: int, transforms: list[tuple[int, int]]) -> float:
   """Determines whether a sample is biased.
 
   This function computes for each s in sample and each a, b in transforms the
@@ -45,7 +45,7 @@ def Bias(sample: List[int], n: int, transforms: List[Tuple[int, int]]) -> float:
   return p_value
 
 
-def PseudoAverage(a: List[int], n: int) -> int:
+def PseudoAverage(a: list[int], n: int) -> int:
   """Finds a integer that is "closest" to a modulo n.
 
   The goal of this function is to define some sort of average
@@ -87,7 +87,7 @@ def PseudoAverage(a: List[int], n: int) -> int:
   return pseudo_average
 
 
-def GetLattice(a: List[int], w: int, n: int) -> List[List[int]]:
+def GetLattice(a: list[int], w: int, n: int) -> list[list[int]]:
   """Returns a lattice for finding a bias.
 
   The goal is to find integers c, d such that the elements of
@@ -123,7 +123,7 @@ def GetLattice(a: List[int], w: int, n: int) -> List[List[int]]:
   return mat
 
 
-def FindBiasImpl(sample: List[int], n: int, w: Optional[int] = None) -> float:
+def FindBiasImpl(sample: list[int], n: int, w: Optional[int] = None) -> float:
   """Attempts to find a bias in a list of samples.
 
   This function works by dividing the given sample into a training sample

@@ -13,16 +13,15 @@
 # limitations under the License.
 """Module for finding ECDSA signatures with the CR50 U2F weakness."""
 
-from typing import Generator, List, Set, Tuple
+from collections.abc import Iterator
 
 import gmpy
 
 from paranoid_crypto.lib import lll
 
 
-def Cr50U2fSubProblem(
-    a: int, b: int, w: int, p: int,
-    basis: List[int]) -> Generator[Tuple[int, int], None, None]:
+def Cr50U2fSubProblem(a: int, b: int, w: int, p: int,
+                      basis: list[int]) -> Iterator[tuple[int, int]]:
   """Generalized subproblem for the U2F weakness.
 
   This function tries to find k1, k2 of the form
@@ -63,7 +62,7 @@ def Cr50U2fSubProblem(
 
 
 def Cr50U2fGuesses(r1: int, s1: int, z1: int, r2: int, s2: int, z2: int,
-                   n: int) -> Set[int]:
+                   n: int) -> set[int]:
   """Checks, whether two signatures use weak nonces like in the U2F flaw.
 
   This function tries to find x, k1, k2 such that:

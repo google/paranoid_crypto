@@ -13,13 +13,13 @@
 # limitations under the License.
 """Module containing base class to be inherited by Paranoid check classes."""
 
-from typing import List, Optional, Union
+from typing import Optional, Union
 from paranoid_crypto import paranoid_pb2
 
 # Type annotations covering the different types of crypto artfifacts
-KeyListType = Union[List[paranoid_pb2.RSAKey], List[paranoid_pb2.ECKey]]
-SigListType = Union[List[paranoid_pb2.RSASignature],
-                    List[paranoid_pb2.ECDSASignature]]
+KeyListType = Union[list[paranoid_pb2.RSAKey], list[paranoid_pb2.ECKey]]
+SigListType = Union[list[paranoid_pb2.RSASignature],
+                    list[paranoid_pb2.ECDSASignature]]
 ArtifactListType = Union[KeyListType, SigListType]
 
 

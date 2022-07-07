@@ -16,7 +16,7 @@
 A storage contains information that might be useful for running the tests.
 """
 import abc
-from typing import AbstractSet
+from collections.abc import Set
 from absl import flags
 from paranoid_crypto.lib.data import data_pb2
 
@@ -34,7 +34,7 @@ class Storage(metaclass=abc.ABCMeta):
     return flag_name in FLAGS and FLAGS[flag_name].value
 
   @abc.abstractmethod
-  def GetUnseededRands(self, size: int) -> AbstractSet[int]:
+  def GetUnseededRands(self, size: int) -> Set[int]:
     """Returns size-bit numbers generated with unseeded PRNGs."""
 
   @abc.abstractmethod
@@ -58,7 +58,7 @@ class Storage(metaclass=abc.ABCMeta):
     """
 
   @abc.abstractmethod
-  def GetOpensslDenylist(self) -> AbstractSet[str]:
+  def GetOpensslDenylist(self) -> Set[str]:
     """Returns a set of data used on CVE-2008-0166 detection.
 
     Each element of the set is a string of the format <keytype>:<h> where h

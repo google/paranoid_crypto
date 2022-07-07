@@ -19,7 +19,6 @@ weaknesses. It does pure math verifications and can be used for in a pipeline.
 import collections
 import enum
 import time
-from typing import List, Dict
 from absl import logging
 from paranoid_crypto import paranoid_pb2
 from paranoid_crypto.lib import base_check
@@ -83,7 +82,7 @@ _ECDSA_ALL = "ecdsa_all"
 _check_factory = collections.defaultdict(dict)
 
 
-def GetRSASingleChecks() -> Dict[str, base_check.BaseCheck]:
+def GetRSASingleChecks() -> dict[str, base_check.BaseCheck]:
   if not _check_factory[_RSA_SINGLES]:
     for test_class in _ACTIVE_RSA_SINGLE_CHECKS:
       check = test_class()
@@ -91,7 +90,7 @@ def GetRSASingleChecks() -> Dict[str, base_check.BaseCheck]:
   return _check_factory[_RSA_SINGLES]
 
 
-def GetRSAAggregateChecks() -> Dict[str, base_check.BaseCheck]:
+def GetRSAAggregateChecks() -> dict[str, base_check.BaseCheck]:
   if not _check_factory[_RSA_AGGREGATES]:
     for test_class in _ACTIVE_RSA_AGGREGATE_CHECKS:
       check = test_class()
@@ -99,14 +98,14 @@ def GetRSAAggregateChecks() -> Dict[str, base_check.BaseCheck]:
   return _check_factory[_RSA_AGGREGATES]
 
 
-def GetRSAAllChecks() -> Dict[str, base_check.BaseCheck]:
+def GetRSAAllChecks() -> dict[str, base_check.BaseCheck]:
   if not _check_factory[_RSA_ALL]:
     _check_factory[_RSA_ALL].update(GetRSASingleChecks())
     _check_factory[_RSA_ALL].update(GetRSAAggregateChecks())
   return _check_factory[_RSA_ALL]
 
 
-def GetECSingleChecks() -> Dict[str, base_check.BaseCheck]:
+def GetECSingleChecks() -> dict[str, base_check.BaseCheck]:
   if not _check_factory[_EC_SINGLES]:
     for test_class in _ACTIVE_EC_SINGLE_CHECKS:
       check = test_class()
@@ -114,7 +113,7 @@ def GetECSingleChecks() -> Dict[str, base_check.BaseCheck]:
   return _check_factory[_EC_SINGLES]
 
 
-def GetECAggregateChecks() -> Dict[str, base_check.BaseCheck]:
+def GetECAggregateChecks() -> dict[str, base_check.BaseCheck]:
   if not _check_factory[_EC_AGGREGATES]:
     for test_class in _ACTIVE_EC_AGGREGATE_CHECKS:
       check = test_class()
@@ -122,14 +121,14 @@ def GetECAggregateChecks() -> Dict[str, base_check.BaseCheck]:
   return _check_factory[_EC_AGGREGATES]
 
 
-def GetECAllChecks() -> Dict[str, base_check.BaseCheck]:
+def GetECAllChecks() -> dict[str, base_check.BaseCheck]:
   if not _check_factory[_EC_ALL]:
     _check_factory[_EC_ALL].update(GetECSingleChecks())
     _check_factory[_EC_ALL].update(GetECAggregateChecks())
   return _check_factory[_EC_ALL]
 
 
-def GetECDSAAllChecks() -> Dict[str, base_check.BaseCheck]:
+def GetECDSAAllChecks() -> dict[str, base_check.BaseCheck]:
   if not _check_factory[_ECDSA_ALL]:
     for test_class in _ACTIVE_ECDSA_SIG_CHECKS:
       check = test_class()
@@ -179,7 +178,7 @@ def _CheckArtifacts(artifacts: base_check.ArtifactListType,
   return any_weak
 
 
-def CheckAllRSA(rsa_keys: List[paranoid_pb2.RSAKey],
+def CheckAllRSA(rsa_keys: list[paranoid_pb2.RSAKey],
                 log_level: int = 0) -> bool:
   """Runs all checks on the RSA input keys.
 
@@ -198,7 +197,7 @@ def CheckAllRSA(rsa_keys: List[paranoid_pb2.RSAKey],
   return _CheckArtifacts(rsa_keys, list(GetRSAAllChecks().items()), log_level)
 
 
-def CheckAllEC(ec_keys: List[paranoid_pb2.ECKey], log_level: int = 0) -> bool:
+def CheckAllEC(ec_keys: list[paranoid_pb2.ECKey], log_level: int = 0) -> bool:
   """Runs all checks on the EC input keys.
 
   Args:
@@ -216,7 +215,7 @@ def CheckAllEC(ec_keys: List[paranoid_pb2.ECKey], log_level: int = 0) -> bool:
   return _CheckArtifacts(ec_keys, list(GetECAllChecks().items()), log_level)
 
 
-def CheckAllECDSASigs(ecdsa_sigs: List[paranoid_pb2.ECDSASignature],
+def CheckAllECDSASigs(ecdsa_sigs: list[paranoid_pb2.ECDSASignature],
                       log_level: int = 0) -> bool:
   """Runs all checks on the ECDSA signatures.
 

@@ -14,14 +14,14 @@
 """Set of functions to find small roots of polynomials modulo an integer."""
 
 import itertools
-from typing import List, Optional
+from typing import Optional
 import gmpy
 from paranoid_crypto.lib import linalg_util
 from paranoid_crypto.lib import lll
 import sympy
 
 
-def _get_monomials(f: sympy.Poly) -> List[sympy.Poly]:
+def _get_monomials(f: sympy.Poly) -> list[sympy.Poly]:
   mons = []
   for exps in f.monoms():
     mon = 1
@@ -108,8 +108,8 @@ def univariate_modp(f: sympy.Poly, b: int, k: int = 3) -> Optional[int]:
 
 
 def multivariate_modp(f: sympy.Poly,
-                      bounds: List[int],
-                      m: int = 4) -> Optional[List[int]]:
+                      bounds: list[int],
+                      m: int = 4) -> Optional[list[int]]:
   """Returns small roots of a multivariate polynomial modulo an unknown factor.
 
   Proposal of M. Herrmann and A. May., 'Solving Linear Equations Modulo
@@ -226,8 +226,8 @@ def multivariate_modp(f: sympy.Poly,
 
 
 def multivariate_modn(f: sympy.Poly,
-                      bounds: List[int],
-                      m: int = 1) -> Optional[List[int]]:
+                      bounds: list[int],
+                      m: int = 1) -> Optional[list[int]]:
   """Returns small roots of a multivariate polynomial modulo an integer.
 
   Proposal of E. Jochemsz and A. May., 'A Strategy for Finding Roots of

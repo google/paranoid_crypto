@@ -68,13 +68,13 @@ is as follows:
 
 import collections
 import math
-from typing import List, Optional, Tuple
+from typing import Optional
 import numpy
 from paranoid_crypto.lib.randomness_tests import berlekamp_massey
 from paranoid_crypto.lib.randomness_tests import util
 
 # Type hints:
-NamedPValues = List[Tuple[str, float]]
+NamedPValues = list[tuple[str, float]]
 
 
 class InsufficientDataError(ValueError):
@@ -85,8 +85,8 @@ class InsufficientDataError(ValueError):
   """
 
 
-def ChiSquare(count: List[int],
-              prob: List[float],
+def ChiSquare(count: list[int],
+              prob: list[float],
               k: Optional[int] = None) -> float:
   """Performs a Chi-Square test.
 
@@ -120,7 +120,7 @@ def ChiSquare(count: List[int],
   return p_value
 
 
-def ChiSquareUniform(count: List[int]) -> float:
+def ChiSquareUniform(count: list[int]) -> float:
   """Performs a Chi-Square test with an expected uniform distribution.
 
   Args:
@@ -152,7 +152,7 @@ def Frequency(bits: int, n: int) -> float:
   return p_value
 
 
-def BlockFrequencyImpl(blocks: List[int], m: int) -> float:
+def BlockFrequencyImpl(blocks: list[int], m: int) -> float:
   """Block frequency test.
 
   This test checks whether the distribution of 0 and 1 bits in blocks
@@ -272,7 +272,7 @@ def LongestRuns(bits: int, n: int) -> float:
 def RankDistribution(r: int,
                      c: int,
                      k: int,
-                     allow_approximation: bool = True) -> List[float]:
+                     allow_approximation: bool = True) -> list[float]:
   """Returns the distribution of the rank of binary r*c matrices.
 
   Args:
@@ -307,7 +307,7 @@ def RankDistribution(r: int,
   return res[-k:][::-1] + [sum(res[:-k])]
 
 
-def BinaryMatrixRankImpl(rows: List[int], r: int, c: int, k: int) -> float:
+def BinaryMatrixRankImpl(rows: list[int], r: int, c: int, k: int) -> float:
   """Binary rank test.
 
   This test takes a list of bit string, divides this list into binary
@@ -436,8 +436,8 @@ def IsNonOverlappingTemplate(template: int, m: int) -> bool:
   return True
 
 
-def NonOverlappingTemplateMatchingImpl(blocks: List[int], n: int, m: int,
-                                       templates: List[int]) -> NamedPValues:
+def NonOverlappingTemplateMatchingImpl(blocks: list[int], n: int, m: int,
+                                       templates: list[int]) -> NamedPValues:
   """Non-overlapping template matching test.
 
   Described in Section 2.7 of NIST SP 800-22
@@ -478,7 +478,7 @@ def NonOverlappingTemplateMatching(
     n: int,
     blocks: int = 8,
     m: Optional[int] = None,
-    templates: Optional[List[int]] = None) -> NamedPValues:
+    templates: Optional[list[int]] = None) -> NamedPValues:
   """Non-overlapping template matching test.
 
   Described in Section 2.7 of NIST SP 800-22
@@ -539,7 +539,7 @@ def NonOverlappingTemplateMatching(
   return NonOverlappingTemplateMatchingImpl(blocks, block_size, m, templates)
 
 
-def OverlappingTemplateMatchingMatrix(m: int, k: int) -> List[List[float]]:
+def OverlappingTemplateMatchingMatrix(m: int, k: int) -> list[list[float]]:
   """Returns a transition probability matrix for the overlapping template test.
 
   The overlapping template test counts the number of runs of 1s of size m in a
@@ -578,7 +578,7 @@ def OverlappingTemplateMatchingMatrix(m: int, k: int) -> List[List[float]]:
 
 
 def OverlappingTemplateMatchingDistribution(n: int, m: int,
-                                            k: int) -> List[float]:
+                                            k: int) -> list[float]:
   """The expected probability distribution of an overlapping matching test.
 
   Args:
@@ -599,7 +599,7 @@ def OverlappingTemplateMatchingDistribution(n: int, m: int,
   return pi
 
 
-def OverlappingTemplateMatchingImpl(blocks: List[int], n: int, m: int) -> float:
+def OverlappingTemplateMatchingImpl(blocks: list[int], n: int, m: int) -> float:
   """Overlapping template matching test.
 
   Described in Section 2.8 of NIST SP 800-22.
@@ -654,7 +654,7 @@ def OverlappingTemplateMatching(bits: int,
   return OverlappingTemplateMatchingImpl(blocks, block_size, m)
 
 
-def UniversalDistribution(block_size: int, k: int) -> Tuple[float, float]:
+def UniversalDistribution(block_size: int, k: int) -> tuple[float, float]:
   """Returns expected value and standard deviation of a universal test.
 
   Args:
@@ -777,7 +777,7 @@ def Universal(bits: int, n: int) -> float:
   return UniversalImpl(bits, n, block_size, q)
 
 
-def LinearComplexityImpl(blocks: List[int], m: int) -> NamedPValues:
+def LinearComplexityImpl(blocks: list[int], m: int) -> NamedPValues:
   # pyformat: disable
   """Performs the linear complexity test.
 
@@ -931,7 +931,7 @@ def Serial(bits: int, n: int, m_max: Optional[int] = None) -> NamedPValues:
   return p_values
 
 
-def ComputeApproximateEntropy(frequencies: List[int]) -> float:
+def ComputeApproximateEntropy(frequencies: list[int]) -> float:
   """Computes the approximate entropy given a list of frequencies.
 
   Args:
@@ -1040,7 +1040,7 @@ def CumulativeSumsPValue(n: int, z: int) -> float:
   return 1.0 + res / 2
 
 
-def RandomExcursionsDistribution(x: int, max_cnt: int = 5) -> List[float]:
+def RandomExcursionsDistribution(x: int, max_cnt: int = 5) -> list[float]:
   """Returns the probability distribution for the random excursions test.
 
   The probability distribution is described in Section 3.14 of NIST SP 800-22.

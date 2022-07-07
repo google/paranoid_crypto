@@ -16,9 +16,9 @@
 A storage contains information that might be useful for running the tests. For
 now, this default implementation uses information stored in the file system.
 """
+from collections.abc import Iterator, Set
 import lzma
 import re
-from typing import AbstractSet, Iterator
 from absl import logging
 from paranoid_crypto.lib import resources
 from paranoid_crypto.lib.data import data_pb2
@@ -43,7 +43,7 @@ class DefaultStorage(storage.Storage):
   different data or want to load from different resources.
   """
 
-  def GetUnseededRands(self, size: int) -> AbstractSet[int]:
+  def GetUnseededRands(self, size: int) -> Set[int]:
     return unseeded_rands.size_unseeded_map.get(size, frozenset())
 
   def GetKeypairData(self) -> data_pb2.KeypairData:
@@ -56,7 +56,7 @@ class DefaultStorage(storage.Storage):
     data = resources.GetParanoidResourceAsFile(path, "rb").read()
     return data_pb2.KeypairData.FromString(lzma.decompress(data))
 
-  def GetOpensslDenylist(self) -> AbstractSet[str]:
+  def GetOpensslDenylist(self) -> Set[str]:
 
     def _ReadDenylist(keytype: str,
                       weak_keylist: Iterator[str]) -> Iterator[str]:

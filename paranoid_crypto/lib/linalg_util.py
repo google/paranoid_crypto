@@ -13,11 +13,11 @@
 # limitations under the License.
 """Set of useful linear algebra functions."""
 
-from typing import List, Optional
+from typing import Optional
 import gmpy
 
 
-def echelon_form(a: List[List[int]], b: Optional[List[int]] = None) -> int:
+def echelon_form(a: list[list[int]], b: Optional[list[int]] = None) -> int:
   """Puts the matrix of integers a in row echelon form.
 
   All the operations are over the integers. Only exact divisions are performed.
@@ -103,8 +103,8 @@ def echelon_form(a: List[List[int]], b: Optional[List[int]] = None) -> int:
   return rank
 
 
-def upper_triangular_solve(a: List[List[int]],
-                           b: List[int]) -> Optional[List[gmpy.mpq]]:
+def upper_triangular_solve(a: list[list[int]],
+                           b: list[int]) -> Optional[list[gmpy.mpq]]:
   """Solves a matrix equation a*x = b, with a being an upper triangular matrix.
 
   Given an integer upper triangular matrix 'a' with m rows and m columns, and an
@@ -134,7 +134,7 @@ def upper_triangular_solve(a: List[List[int]],
   return xs
 
 
-def solve_right(a: List[List[int]], b: List[int]) -> Optional[List[gmpy.mpq]]:
+def solve_right(a: list[list[int]], b: list[int]) -> Optional[list[gmpy.mpq]]:
   """Solves a matrix equation a*x = b.
 
   Given an integer matrix 'a' of m rows and n columns, with m >= n and an

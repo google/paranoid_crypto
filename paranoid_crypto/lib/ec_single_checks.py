@@ -13,7 +13,6 @@
 # limitations under the License.
 """Module containing Paranoid single checks for EC keys."""
 
-from typing import List
 from absl import logging
 from paranoid_crypto import paranoid_pb2
 from paranoid_crypto.lib import base_check
@@ -41,7 +40,7 @@ class CheckValidECKey(base_check.BaseCheck):
   def __init__(self):
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_MEDIUM)
 
-  def Check(self, artifacts: List[paranoid_pb2.ECKey]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.ECKey]) -> bool:
     any_weak = False
     for key in artifacts:
       test_result = self._CreateTestResult()
@@ -69,7 +68,7 @@ class CheckWeakCurve(base_check.BaseCheck):
   def __init__(self):
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_MEDIUM)
 
-  def Check(self, artifacts: List[paranoid_pb2.ECKey]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.ECKey]) -> bool:
     any_weak = False
     # The minimal bit_length of the order of the curve. The order of a 224-bit
     # curve can be slightly smaller than 2**224. Such curves would not fail the
@@ -119,7 +118,7 @@ class CheckWeakECPrivateKey(base_check.BaseCheck):
   def __init__(self):
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_CRITICAL)
 
-  def Check(self, artifacts: List[paranoid_pb2.ECKey]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.ECKey]) -> bool:
     any_weak = False
     for curve_id, curve in ec_util.CURVE_FACTORY.items():
       if curve is None:

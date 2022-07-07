@@ -18,7 +18,6 @@ solely purpose of testing keys potentially weak to CVE-2021-41117. Please do not
 copy-paste nor use this code.
 """
 import hashlib
-from typing import Tuple
 from cryptography.hazmat.primitives import ciphers
 from cryptography.hazmat.primitives.ciphers import algorithms
 from cryptography.hazmat.primitives.ciphers import modes
@@ -82,7 +81,7 @@ class Generator():
       if gmpy.is_prime(p, 10):
         return p
 
-  def generate_key(self, bits: int) -> Tuple[int, int]:
+  def generate_key(self, bits: int) -> tuple[int, int]:
     """Generates the primes as in an RSA key.
 
     Args:

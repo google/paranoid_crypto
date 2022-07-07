@@ -13,7 +13,8 @@
 # limitations under the License.
 """Set of functions that are useful for paranoid library or its callers."""
 import ast
-from typing import Iterable, Optional, Set
+from collections.abc import Iterable
+from typing import Optional
 from paranoid_crypto import paranoid_pb2
 
 
@@ -133,7 +134,7 @@ def AttachInfo(test_info: paranoid_pb2.TestInfo, info_name: str, value: str):
 
 
 def GetAttachedFactors(test_info: paranoid_pb2.TestInfo,
-                       info_name: str) -> Optional[Set[int]]:
+                       info_name: str) -> Optional[set[int]]:
   """Resturns a set of factors stored in test_info.attached_info with info_name.
 
   Args:

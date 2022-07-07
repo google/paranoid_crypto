@@ -43,7 +43,7 @@ For example the paper above describes the use of a sloppy reduction.
 """
 
 import math
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Optional, Union
 import gmpy
 from paranoid_crypto import paranoid_pb2
 from paranoid_crypto.lib import util
@@ -59,8 +59,8 @@ INFINITY_JACOBIAN = (1, 1, 0)
 
 # Type hint for annotating points on a curve.
 Coordinate = Optional[int]
-EcPoint = Union[Tuple[int, int], Tuple[None, None]]
-EcPointJacobian = Tuple[int, int, int]
+EcPoint = Union[tuple[int, int], tuple[None, None]]
+EcPointJacobian = tuple[int, int, int]
 
 
 class EcCurve:
@@ -380,7 +380,7 @@ class EcCurve:
       pj = self.DoubleJacobian(pj)
     return self.JacobianToAffine(res)
 
-  def BatchJacobianToX(self, p_list: List[EcPointJacobian]) -> List[Coordinate]:
+  def BatchJacobianToX(self, p_list: list[EcPointJacobian]) -> list[Coordinate]:
     """Returns the x-coordinates of a list of points in Jacobian representation.
 
     Args:
@@ -401,7 +401,7 @@ class EcCurve:
     return res
 
   def BatchJacobianToAffine(self,
-                            p_list: List[EcPointJacobian]) -> List[EcPoint]:
+                            p_list: list[EcPointJacobian]) -> list[EcPoint]:
     """Converts a list of points from Jacobian to affine representation.
 
     Args:
@@ -425,7 +425,7 @@ class EcCurve:
         res[i] = (x, y)
     return res
 
-  def BatchInverse(self, values: List[Coordinate]) -> List[Coordinate]:
+  def BatchInverse(self, values: list[Coordinate]) -> list[Coordinate]:
     """Computes the inverse of all integers in a list.
 
     Args:
@@ -458,8 +458,8 @@ class EcCurve:
       raise ArithmeticError("failed invariant")
     return res
 
-  def BatchAddList(self, p_list: List[EcPoint],
-                   q_list: List[EcPoint]) -> List[EcPoint]:
+  def BatchAddList(self, p_list: list[EcPoint],
+                   q_list: list[EcPoint]) -> list[EcPoint]:
     """Computes the sum of two lists of points.
 
     Args:
@@ -496,7 +496,7 @@ class EcCurve:
         res[i] = (x, y)
     return res
 
-  def BatchDouble(self, p_list: List[EcPoint]) -> List[EcPoint]:
+  def BatchDouble(self, p_list: list[EcPoint]) -> list[EcPoint]:
     """Doubles all points in a list.
 
     Args:
@@ -524,7 +524,7 @@ class EcCurve:
         res[i] = (x2, y2)
     return res
 
-  def BatchAdd(self, p: EcPoint, points: List[EcPoint]) -> List[EcPoint]:
+  def BatchAdd(self, p: EcPoint, points: list[EcPoint]) -> list[EcPoint]:
     """Computes the addition of a point and a list of points.
 
     Args:
@@ -552,7 +552,7 @@ class EcCurve:
         res[i] = self.Add(p, points[i])
     return res
 
-  def BatchAddX(self, p: EcPoint, points: List[EcPoint]) -> List[Coordinate]:
+  def BatchAddX(self, p: EcPoint, points: list[EcPoint]) -> list[Coordinate]:
     """Computes the X-coordinate of the sum of a point and a list of points.
 
     Args:
@@ -580,7 +580,7 @@ class EcCurve:
 
   def BatchAddSubtractX(
       self, p: EcPoint,
-      points: List[EcPoint]) -> Tuple[List[Coordinate], List[Coordinate]]:
+      points: list[EcPoint]) -> tuple[list[Coordinate], list[Coordinate]]:
     """Does a batch computation.
 
        Computes the X-coordinate of the addition and subtraction of a point
@@ -619,7 +619,7 @@ class EcCurve:
         diffs[i] = self.Subtract(p, q)[0]
     return sums, diffs
 
-  def BatchMultiplyG(self, scalars: List[int]) -> List[EcPoint]:
+  def BatchMultiplyG(self, scalars: list[int]) -> list[EcPoint]:
     """Multiplies the generator of this curve by a list of integers.
 
     This function can be used to compute the public keys corresponding to
@@ -656,7 +656,7 @@ class EcCurve:
         res = self.BatchAddList(res, points)
     return res
 
-  def PointSequence(self, base: EcPoint, n: int) -> List[Optional[EcPoint]]:
+  def PointSequence(self, base: EcPoint, n: int) -> list[Optional[EcPoint]]:
     """Returns [self.Multiply(base, i) for i in range(n)].
 
     Args:
@@ -673,7 +673,7 @@ class EcCurve:
       res[i] = self.AddJacobian(res[i - 1], base_jac)
     return self.BatchJacobianToAffine(res)
 
-  def PointTable(self, base: EcPoint, n: int) -> Dict[int, int]:
+  def PointTable(self, base: EcPoint, n: int) -> dict[int, int]:
     """Returns a dict with {self.Multiply(base, i)[0]:i for i in range(n)}.
 
     Args:
@@ -702,7 +702,7 @@ class EcCurve:
         res[x] = im + j
     return res
 
-  def BatchDL(self, points: List[EcPoint], n: int) -> List[Optional[int]]:
+  def BatchDL(self, points: list[EcPoint], n: int) -> list[Optional[int]]:
     """Tries to find small discrete logarithms for a batch of targets.
 
     The implementation finds discrete logarithms for any point p,
@@ -751,7 +751,7 @@ class EcCurve:
                 res[i] = -dl
     return res
 
-  def ExtendedBatchDL(self, points: List[EcPoint]) -> List[Optional[int]]:
+  def ExtendedBatchDL(self, points: list[EcPoint]) -> list[Optional[int]]:
     """Finds the DLs of points assuming the DLs have a special form.
 
     This method finds the DL x of any points if x has one of the following
@@ -808,9 +808,9 @@ class EcCurve:
     return res
 
   def BatchDLOfDifferences(self,
-                           points: List[EcPoint],
-                           other_points: Optional[List[EcPoint]] = None,
-                           max_diff: int = 2**24) -> List[Optional[str]]:
+                           points: list[EcPoint],
+                           other_points: Optional[list[EcPoint]] = None,
+                           max_diff: int = 2**24) -> list[Optional[str]]:
     """Finds small DLs of differences between points.
 
     This functions finds pairs of weak keys with points p and q
@@ -870,7 +870,7 @@ class EcCurve:
       h >>= shift
     return h % self.n
 
-  def HiddenNumberParams(self, r: int, s: int, z: int) -> Tuple[int, int]:
+  def HiddenNumberParams(self, r: int, s: int, z: int) -> tuple[int, int]:
     """Computes parameters for a hidden number problem from a signature (r,s).
 
     A hidden number problem for an unknown integer s consists of two lists of
@@ -896,7 +896,7 @@ class EcCurve:
     return (a, b)
 
 
-def PublicPoint(key: paranoid_pb2.ECKeyInfo) -> Tuple[int, int]:
+def PublicPoint(key: paranoid_pb2.ECKeyInfo) -> tuple[int, int]:
   """Returns the point of the public key.
 
   Args:
@@ -912,7 +912,7 @@ def PublicPoint(key: paranoid_pb2.ECKeyInfo) -> Tuple[int, int]:
 
 
 def ECDSAValues(sig: paranoid_pb2.ECDSASignatureInfo,
-                curve: EcCurve) -> Tuple[int, int, int]:
+                curve: EcCurve) -> tuple[int, int, int]:
   """Returns a triple (r, s, z) containing values of the ecdsa signature.
 
   Args:

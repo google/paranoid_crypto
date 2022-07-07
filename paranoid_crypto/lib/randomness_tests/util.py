@@ -14,8 +14,8 @@
 """Implements common functions used by NIST SP-800 22."""
 
 import array
+from collections.abc import Iterator
 import math
-from typing import List, Generator
 import gmpy
 import numpy
 from scipy import fftpack as scipy_fft
@@ -127,7 +127,7 @@ def UniformSumCdf(n: int, x: float) -> float:
     return p_value
 
 
-def CombinedPValue(pvalues: List[float]) -> float:
+def CombinedPValue(pvalues: list[float]) -> float:
   """Computes a combined p-value for a list of p-values.
 
   When tests are repeated then the result of these tests is a list of p-values.
@@ -231,7 +231,7 @@ def Bits(seq: int, length: int) -> array.array:
 def SubSequences(seq: int,
                  length: int,
                  m: int,
-                 wrap: bool = True) -> Generator[int, None, None]:
+                 wrap: bool = True) -> Iterator[int]:
   """Yields all m-bit subsequences of seq.
 
   The order of the subsequences is not defined. The same subsequence
@@ -274,7 +274,7 @@ def SubSequences(seq: int,
 def FrequencyCount(seq: int,
                    length: int,
                    m: int,
-                   wrap: bool = True) -> List[int]:
+                   wrap: bool = True) -> list[int]:
   """Counts the number of occurrences of m-bit subsequences of seq.
 
   The bit string seq is assumed to be a loop. Hence subsequences
@@ -356,7 +356,7 @@ def FrequencyCount(seq: int,
   return res
 
 
-def SplitSequence(seq: int, length: int, m: int) -> List[int]:
+def SplitSequence(seq: int, length: int, m: int) -> list[int]:
   """Splits a bit sequence into non-overlapping blocks of size m.
 
   The splitting starts with the least significant bits. If the length
@@ -390,7 +390,7 @@ def SplitSequence(seq: int, length: int, m: int) -> List[int]:
   return res
 
 
-def Scatter(seq: int, m: int) -> List[int]:
+def Scatter(seq: int, m: int) -> list[int]:
   """Divides the bits of seq into m interleaved bit strings.
 
   Args:
@@ -506,7 +506,7 @@ def OverlappingRunsOfOnes(seq: int, m: int) -> int:
   return BitCount(seq)
 
 
-def BinaryMatrixRank(matrix: List[int]) -> int:
+def BinaryMatrixRank(matrix: list[int]) -> int:
   """Computes the rank of a binary matrix.
 
   The rank of a matrix is the number of linearly independent rows.
@@ -529,7 +529,7 @@ def BinaryMatrixRank(matrix: List[int]) -> int:
     return _BinaryMatrixRankLarge(matrix)
 
 
-def _BinaryMatrixRankSmall(matrix: List[int]) -> int:
+def _BinaryMatrixRankSmall(matrix: list[int]) -> int:
   """Computes the rank of a binary matrix.
 
   This implementation is used for small matrices.
@@ -552,7 +552,7 @@ def _BinaryMatrixRankSmall(matrix: List[int]) -> int:
   return rank
 
 
-def _BinaryMatrixRankLarge(matrix: List[int]) -> int:
+def _BinaryMatrixRankLarge(matrix: list[int]) -> int:
   """Computes the rank of a binary matrix.
 
   This implementation is fast for large matrices. The implementation
@@ -631,7 +631,7 @@ def _BinaryMatrixRankLarge(matrix: List[int]) -> int:
   return rank
 
 
-def Dft(x: List[float]) -> numpy.ndarray:
+def Dft(x: list[float]) -> numpy.ndarray:
   """Returns the absolute values of the FFT of x.
 
   This is described in Section 3.6 of NIST SP 800-22.

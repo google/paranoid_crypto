@@ -14,7 +14,7 @@
 """Module containing Paranoid checks for ECDSA signatures."""
 
 import collections
-from typing import Dict, List, Optional, Tuple
+from typing import Optional
 from absl import logging
 from paranoid_crypto import paranoid_pb2
 from paranoid_crypto.lib import base_check
@@ -28,8 +28,8 @@ from paranoid_crypto.lib import util
 
 
 def _MapIssuerSigIndexes(
-    sigs: List[paranoid_pb2.ECDSASignature]
-) -> Dict[Tuple[int, int], List[int]]:
+    sigs: list[paranoid_pb2.ECDSASignature]
+) -> dict[tuple[int, int], list[int]]:
   """Maps issuer points/public keys into signature indexes."""
   pks = collections.defaultdict(list)
   for i, sig in enumerate(sigs):
@@ -37,8 +37,8 @@ def _MapIssuerSigIndexes(
   return pks
 
 
-def _IssuerDLogs(guesses: List[int], pks: Dict[Tuple[int, int], List[int]],
-                 curve: ec_util.EcCurve) -> Dict[int, int]:
+def _IssuerDLogs(guesses: list[int], pks: dict[tuple[int, int], list[int]],
+                 curve: ec_util.EcCurve) -> dict[int, int]:
   """Check which guesses match public key discrete logs on a specific curve.
 
   Args:
@@ -62,7 +62,7 @@ class BiasedBaseCheck(base_check.BaseCheck):
 
   def __init__(self,
                bias: Optional[hnp.Bias] = None,
-               lcg_params: Optional[Tuple[lcg_constants.LcgName,
+               lcg_params: Optional[tuple[lcg_constants.LcgName,
                                           hnp.SearchStrategy]] = None):
     """General construtor for biased nonce checks.
 
@@ -81,7 +81,7 @@ class BiasedBaseCheck(base_check.BaseCheck):
       raise ValueError(
           "Either bias or lcg_params should be defined, but not both.")
 
-  def Check(self, artifacts: List[paranoid_pb2.ECDSASignature]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.ECDSASignature]) -> bool:
     any_weak = False
     for curve_id, curve in ec_util.CURVE_FACTORY.items():
       if curve is None:
@@ -199,7 +199,7 @@ class CheckIssuerKey(base_check.BaseCheck):
   def __init__(self):
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_UNKNOWN)
 
-  def Check(self, artifacts: List[paranoid_pb2.ECDSASignature]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.ECDSASignature]) -> bool:
     any_weak = False
     # Maps points/public keys into signature indexes to avoid duplicated keys:
     points = {}
@@ -235,7 +235,7 @@ class CheckCr50U2f(base_check.BaseCheck):
   def __init__(self):
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_CRITICAL)
 
-  def Check(self, artifacts: List[paranoid_pb2.ECDSASignature]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.ECDSASignature]) -> bool:
     any_weak = False
     for curve_id, curve in ec_util.CURVE_FACTORY.items():
       if curve is None:

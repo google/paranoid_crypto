@@ -13,8 +13,6 @@
 # limitations under the License.
 """Detects ROCA weak keys (https://en.wikipedia.org/wiki/ROCA_vulnerability)."""
 
-from typing import List
-
 
 class ROCAKeyDetector(object):
   """Detect weak ROCA keys."""
@@ -70,7 +68,7 @@ class ROCAKeyVariantDetector(object):
     for p in self.PRIMES:
       self.quadratic_residues[p] = self._QuadraticResidues(p)
 
-  def _QuadraticResidues(self, p: int) -> List[bool]:
+  def _QuadraticResidues(self, p: int) -> list[bool]:
     """Computes the quadratic residues modulo p.
 
     Args:

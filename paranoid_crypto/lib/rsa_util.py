@@ -14,15 +14,15 @@
 """Set of math functions that are useful when checking RSA."""
 
 import heapq
-from typing import List, Tuple, Optional
+from typing import Optional
 import gmpy
 from paranoid_crypto.lib import lll
 from paranoid_crypto.lib import ntheory_util
 from paranoid_crypto.lib import special_case_factoring
 
 
-def BatchGCD(values: List[int],
-             other_values_prod: Optional[int] = None) -> List[int]:
+def BatchGCD(values: list[int],
+             other_values_prod: Optional[int] = None) -> list[int]:
   """Returns a list with the GCD for each number with all the other values.
 
   Args:
@@ -58,7 +58,7 @@ def BatchGCD(values: List[int],
   return [gcds_dict[v] for v in values]
 
 
-def FermatFactor(n: int, max_steps: int) -> Optional[Tuple[int, int]]:
+def FermatFactor(n: int, max_steps: int) -> Optional[tuple[int, int]]:
   """Returns p and q such as n = p*q.
 
   Fermat's factorization method is based on the representation of an odd
@@ -94,7 +94,7 @@ def FermatFactor(n: int, max_steps: int) -> Optional[Tuple[int, int]]:
 
 
 def FactorHighAndLowBitsEqual(n: int,
-                              middle_bits: int = 3) -> Optional[List[int]]:
+                              middle_bits: int = 3) -> Optional[list[int]]:
   """Factors n = p*q if p and q share sufficiently many high and low bits.
 
   This function factors n if about n.bit_length() / 4 of the high bits and
@@ -195,7 +195,7 @@ def FactorHighAndLowBitsEqual(n: int,
   return None
 
 
-def CheckContinuedFraction(n: int, bound: int) -> Tuple[bool, List[int]]:
+def CheckContinuedFraction(n: int, bound: int) -> tuple[bool, list[int]]:
   """Checks an RSA modulus for large coefficients in a continued fraction.
 
   Motivation:
@@ -296,7 +296,7 @@ def CheckContinuedFraction(n: int, bound: int) -> Tuple[bool, List[int]]:
   return True, []
 
 
-def CheckFraction(n: int, d0: int = 1) -> List[int]:
+def CheckFraction(n: int, d0: int = 1) -> list[int]:
   """Attempts to factor an RSA moduli where one factor is close to a fraction.
 
   The method here attempts to find a factorization of n assuming that the
@@ -377,7 +377,7 @@ def CheckFraction(n: int, d0: int = 1) -> List[int]:
   return []
 
 
-def CheckSmallUpperDifferences(n: int) -> Optional[List[int]]:
+def CheckSmallUpperDifferences(n: int) -> Optional[list[int]]:
   """Checks if abs(p - q) has some special form.
 
   FIPS 186-4 requires that p and q are chosen such that
@@ -417,7 +417,7 @@ def CheckSmallUpperDifferences(n: int) -> Optional[List[int]]:
 
 def Pollardpm1(n: int,
                m: Optional[int] = None,
-               gcd_bound: int = 2**60) -> Tuple[bool, List[int]]:
+               gcd_bound: int = 2**60) -> tuple[bool, list[int]]:
   """Checks if an RSA modulus is factorable by pollard p-1 method.
 
   Pollard's p-1 algorithm finds factors when the number preceding the factor,
@@ -471,7 +471,7 @@ def Pollardpm1(n: int,
 
 def CheckLowHammingWeight(n: int,
                           cutoff: int = 2500,
-                          maxsteps: int = 10**6) -> Tuple[bool, List[int]]:
+                          maxsteps: int = 10**6) -> tuple[bool, list[int]]:
   """Tries to factor n assuming that the factors have a low Hamming weight.
 
 

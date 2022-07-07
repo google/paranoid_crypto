@@ -20,9 +20,10 @@ are available for testing.
 """
 
 import collections
+from collections.abc import Callable
 import enum
 import time
-from typing import Optional, Any, Callable, Union
+from typing import Optional, Any, Union
 from absl import logging
 from paranoid_crypto.lib.randomness_tests import extended_nist_suite
 from paranoid_crypto.lib.randomness_tests import lattice_suite

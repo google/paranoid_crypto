@@ -17,12 +17,12 @@ The motivaton behind these algorithm is that RSA moduli can often be factored
 if partial information about the prime numbers is known.
 """
 
-from typing import Optional, List
+from typing import Optional
 import gmpy
 from paranoid_crypto.lib import ntheory_util
 
 
-def FactorWithGuess(n: int, p_0: int) -> Optional[List[int]]:
+def FactorWithGuess(n: int, p_0: int) -> Optional[list[int]]:
   """Tries to factor an RSA modulus n given an approximation p_0 of p.
 
   The method finds a factorization if p_0 is close enough to a factor p

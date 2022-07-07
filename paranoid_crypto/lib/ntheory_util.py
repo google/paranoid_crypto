@@ -14,11 +14,11 @@
 """Set of useful number theory functions."""
 
 import itertools
-from typing import List, Tuple, Optional
+from typing import Optional
 import gmpy
 
 
-def FastProduct(values: List[int]) -> int:
+def FastProduct(values: list[int]) -> int:
   """Returns a product computed using a product tree.
 
   Args:
@@ -32,7 +32,7 @@ def FastProduct(values: List[int]) -> int:
   return values[0]
 
 
-def ExtendedProductTree(values: List[int]) -> Tuple[List[List[int]], int]:
+def ExtendedProductTree(values: list[int]) -> tuple[list[list[int]], int]:
   """Returns a product tree and a value T.
 
   The value T is defined as T = sum(P//v for v in values), where P is the
@@ -126,7 +126,7 @@ def InverseSqrt2exp(n: int, k: int) -> Optional[int]:
   return a
 
 
-def Sqrt2exp(n: int, k: int) -> List[int]:
+def Sqrt2exp(n: int, k: int) -> list[int]:
   """Returns all square roots of n modulo 2**k, where n is odd.
 
   This function is restricted to odd inputs n, since only this case
@@ -160,7 +160,7 @@ def Sqrt2exp(n: int, k: int) -> List[int]:
   return roots
 
 
-def ContinuedFraction(a: int, b: int) -> List[Tuple[int, int, int]]:
+def ContinuedFraction(a: int, b: int) -> list[tuple[int, int, int]]:
   """Computes a continued fraction expansion and partial convergents.
 
   Args:
@@ -185,7 +185,7 @@ def ContinuedFraction(a: int, b: int) -> List[Tuple[int, int, int]]:
   return res
 
 
-def DivmodRounded(a: int, b: int) -> Tuple[int, int]:
+def DivmodRounded(a: int, b: int) -> tuple[int, int]:
   """Performs a rounded division.
 
   Args:
@@ -200,7 +200,7 @@ def DivmodRounded(a: int, b: int) -> Tuple[int, int]:
   return x, y - d
 
 
-def Sieve(n: int) -> List[int]:
+def Sieve(n: int) -> list[int]:
   """Using Sieve of Eratosthenes, returns all primes lower than n."""
   table = [True] * n
   for i in range(2, gmpy.sqrt(n) + 1):

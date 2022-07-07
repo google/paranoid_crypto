@@ -13,7 +13,6 @@
 # limitations under the License.
 """Module containing Paranoid checks on group of RSA keys by aggregation."""
 
-from typing import List
 from absl import logging
 import gmpy
 from paranoid_crypto import paranoid_pb2
@@ -29,7 +28,7 @@ class CheckGCD(base_check.BaseCheck):
   def __init__(self):
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_CRITICAL)
 
-  def Check(self, artifacts: List[paranoid_pb2.RSAKey]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
     any_weak = False
     vals = [gmpy.mpz(util.Bytes2Int(key.rsa_info.n)) for key in artifacts]
     gcds = rsa_util.BatchGCD(vals)
@@ -92,7 +91,7 @@ class CheckGCDN1(base_check.BaseCheck):
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_UNKNOWN)
     self._gcd_bound = gcd_bound
 
-  def Check(self, artifacts: List[paranoid_pb2.RSAKey]) -> bool:
+  def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
     any_weak = False
     vals = [gmpy.mpz(util.Bytes2Int(key.rsa_info.n)) - 1 for key in artifacts]
     # gcds[i] is the GCD of n-1 a key with the product of n-1 of all other keys.

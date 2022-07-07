@@ -22,7 +22,7 @@ import hashlib
 import math
 import os
 import random
-from typing import Optional, Type
+from typing import Optional
 
 import gmpy
 from numpy import random as numpy_random
@@ -377,7 +377,7 @@ class Mwc(Rng):
 class NumpyRng(Rng):
   """Base class for wrapping numpy's pseodurandom number generators."""
 
-  def __init__(self, bit_generator: Type[numpy_random.BitGenerator]):
+  def __init__(self, bit_generator: type[numpy_random.BitGenerator]):
     self.bit_generator = bit_generator
 
   def RandomBits(self, n: int, *, seed: Optional[int] = None) -> int:
