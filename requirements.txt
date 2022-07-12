@@ -1,2 +1,6 @@
 absl-py
-protobuf
+cryptography
+gmpy
+protobuf==3.20.*
+scipy
+sympy

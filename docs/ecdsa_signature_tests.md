@@ -383,7 +383,7 @@ assign the same severity of the key check that found the issuer key as weak.
 
 [BoPeVe]: http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.52.2547&rep=rep1&type=pdf "V. Boyko, M. Peinado, R. Venkatesan, Speeding up Discrete Log and Factoring Based Schemes via Precomputations"
 [BreHen]: https://eprint.iacr.org/2019/023.pdf "Biased Nonce Sense: Lattice Attacks against Weak ECDSA Signatures in Cryptocurrencies"
-[BGM]: https://cseweb.ucsd.edu/~mihir/papers/dss-lcg.pdf "M. Bellare, S. Goldwasser, D. Micciancio, Pseudo-Random" Number Generation within Cryptographic Algorithms: the DSS Case"
+[BGM]: https://cseweb.ucsd.edu/~mihir/papers/dss-lcg.pdf "M. Bellare, S. Goldwasser, D. Micciancio, Pseudo-Random Number Generation within Cryptographic Algorithms: the DSS Case"
 [CorGin]: https://eprint.iacr.org/2020/461.pdf "J.-S. Coron, A. Gini, A Polynomial-Time Algorithm for Solving the Hidden Subset Sum Problem"
 [HowSma]: https://www.hpl.hp.com/techreports/1999/HPL-1999-90.pdf "N.A. Howgrave-Graham, N.P. Smart, Lattice Attacks on Digital Signature Schemes"
 [Nguyen]: https://cr.yp.to/bib/2001/nguyen.ps "The Two faces of lattices in Cryptology"
