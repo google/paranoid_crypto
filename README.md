@@ -108,7 +108,7 @@ installed.
 
 After cloning the repository, build the docker image:
 
-```$ docker build -t paranoid-img```
+```$ docker build -t paranoid-img .```
 
 Create and start the container:
 
