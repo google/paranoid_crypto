@@ -2,13 +2,13 @@
 
 ## Overview
 
-**Paranoid** project checks for potential weaknesses on cryptographic artifacts,
+**Paranoid** project checks for well known weaknesses on cryptographic artifacts
 such as public keys, digital signatures and general pseudorandom numbers.
 
-The project is motivated by many previous work found on the literature that
-performed similar checks in mass crypto artifacts and showed that in some
-situations, the generation of such artifacts are questionable. Here are just
-some examples:
+The library contains implementations and optimizations of existing work found in
+the literature that performed checks on mass crypto artifacts and showed that in
+some situations, the generation of such artifacts are questionable. Here are
+just some examples:
 
 -   [Arjen K. Lenstra, James P. Hughes, Maxime Augier, Joppe W. Bos, Thorsten
     Kleinjung, and Christophe Wachter. (2012). **Ron was wrong, Whit is
@@ -49,11 +49,11 @@ motivation is to detect the usage of weak third party hardware or software black
 boxes. Hence, Paranoid can be used even if we are not able to inspect the source
 code (situation 3. listed above).
 
-The project aims to detect known weaknesses as well as unknown ones. E.g.,
-it tries to identify flaws caused by programming errors or the use of weak
-proprietary random number generators. Detecting new weaknesses is of course
-much more difficult than detecting known ones. Such detections may require
-large sets of signatures or find weak artifacts only with a low probability.
+The project aims to detect known vulnerabilities as well as unknown ones. E.g.,
+it tries to identify vulnerabilities caused by programming errors or the use of
+weak proprietary random number generators. Detecting new vulnerabilities is of
+course much more difficult than detecting known ones. Such detections may
+require large sets of artifacts or find weak ones only with a low probability.
 
 Therefore, we are very interested to receive feedback and learn about the
 cryptographic library that generated weak cryptographic artifacts. The project
@@ -132,7 +132,7 @@ OK
 ## ABOUT
 
 This library is developed and maintained by members of Google Security Team, but
-this is not an officiallly supported Google product. If you want to contribute,
+this is not an officially supported Google product. If you want to contribute,
 please read [CONTRIBUTING](CONTRIBUTING.md) and send us pull requests. You can
 also report bugs or file feature requests.
 
