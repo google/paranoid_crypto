@@ -4,11 +4,10 @@
 
 **Paranoid** project checks for well known weaknesses on cryptographic artifacts
 such as public keys, digital signatures and general pseudorandom numbers.
-
-The library contains implementations and optimizations of existing work found in
-the literature that performed checks on mass crypto artifacts and showed that in
-some situations, the generation of such artifacts are questionable. Here are
-just some examples:
+This library contains implementations and optimizations of existing work found
+in the literature. The existing work showed that the generation of these
+artifacts was flawed in some cases. The following  are some examples of
+publications the library is based on.
 
 -   [Arjen K. Lenstra, James P. Hughes, Maxime Augier, Joppe W. Bos, Thorsten
     Kleinjung, and Christophe Wachter. (2012). **Ron was wrong, Whit is
@@ -142,7 +141,7 @@ BibTeX:
 @software{Barbosa_Bleichenbacher_Paranoid_Crypto_2022,
   author = {Barbosa, Pedro and Bleichenbacher, Daniel},
   license = {Apache-2.0},
-  month = {7},
+  month = {8},
   title = {{Paranoid Crypto}},
   url = {https://github.com/google/paranoid_crypto},
   year = {2022}
