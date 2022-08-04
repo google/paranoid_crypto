@@ -53,7 +53,9 @@ def _get_protoc_command():
   if 'PROTOC' in os.environ and os.path.exists(os.environ['PROTOC']):
     return os.environ['PROTOC']
   else:
-    return spawn.find_executable('protoc')
+    filepath = spawn.find_executable('protoc')
+    if filepath is not None:
+      return filepath
   raise FileNotFoundError('Could not find protoc executable. Please install '
                           'protoc to compile the paranoid_crypto package.')
 
