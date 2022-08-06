@@ -17,7 +17,7 @@ from distutils import spawn
 import os
 
 import subprocess
-from pybind11.setup_helpers import Pybind11Extension, build_ext
+from pybind11.setup_helpers import Pybind11Extension
 import setuptools
 
 _PROJECT_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -113,7 +113,6 @@ def main():
       url='https://github.com/google/paranoid_crypto',
       install_requires=_parse_requirements('requirements.txt'),
       long_description=open('README.md').read(),
-      cmdclass={"build_ext": build_ext},
   )
 
 
