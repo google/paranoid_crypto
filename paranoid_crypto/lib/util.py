@@ -33,7 +33,7 @@ def Int2Bytes(int_val: int) -> bytes:
 
 
 def GetHighestSeverity(test_info: paranoid_pb2.TestInfo) -> Optional[int]:
-  """Resturns the highest severity from all failed tests stored in test_info.
+  """Returns the highest severity from all failed tests stored in test_info.
 
   Args:
     test_info: An instance of paranoid_pb2.TestInfo protobuf, where the highest
