@@ -92,9 +92,13 @@ class BiasedBaseCheck(base_check.BaseCheck):
       pks = _MapIssuerSigIndexes(sigs)
       guesses = set()
       for _, idxs in pks.items():
-        a, b = [None] * len(idxs), [None] * len(idxs)
-        for i, idx in enumerate(idxs):
-          r, s, z = ec_util.ECDSAValues(sigs[idx].ecdsa_sig_info, curve)
+        # Exclude duplicate signatures from the actual processing
+        unique_vals = list({
+            ec_util.ECDSAValues(sigs[idx].ecdsa_sig_info, curve) for idx in idxs
+        })
+        a, b = [None] * len(unique_vals), [None] * len(unique_vals)
+        for i in range(len(unique_vals)):
+          r, s, z = unique_vals[i]
           a[i], b[i] = curve.HiddenNumberParams(r, s, z)
         if self.bias:
           # For general biases it makes sense to check with different sizes for
@@ -246,15 +250,18 @@ class CheckCr50U2f(base_check.BaseCheck):
       pks = _MapIssuerSigIndexes(sigs)
       guesses = set()
       for _, idxs in pks.items():
+        # Exclude duplicate signatures from the actual processing
+        unique_vals = list({
+            ec_util.ECDSAValues(sigs[idx].ecdsa_sig_info, curve) for idx in idxs
+        })
         # Sliding window. Two signatures are enough to detect this vulnerability
-        for i in range(len(idxs) - 1):
-          r1, s1, z1 = ec_util.ECDSAValues(sigs[idxs[i]].ecdsa_sig_info, curve)
-          r2, s2, z2 = ec_util.ECDSAValues(sigs[idxs[i + 1]].ecdsa_sig_info,
-                                           curve)
+        for i in range(len(unique_vals) - 1):
+          r1, s1, z1 = unique_vals[i]
+          r2, s2, z2 = unique_vals[i + 1]
           guesses.update(
               cr50_u2f_weakness.Cr50U2fGuesses(r1, s1, z1, r2, s2, z2, curve.n))
         # Also test a single/last signature, assuming also weak private key
-        r1, s1, z1 = ec_util.ECDSAValues(sigs[idxs[-1]].ecdsa_sig_info, curve)
+        r1, s1, z1 = unique_vals[-1]
         guesses.update(
             cr50_u2f_weakness.Cr50U2fGuesses(r1, s1, z1, 1, 1, 0, curve.n))
       issuer_dlogs = _IssuerDLogs(list(guesses), pks, curve)

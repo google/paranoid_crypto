@@ -13,6 +13,7 @@
 # limitations under the License.
 """ECDSA Tests for paranoid_crypto.lib.paranoid."""
 
+import copy
 from absl.testing import absltest
 from paranoid_crypto import paranoid_pb2
 from paranoid_crypto.lib import paranoid
@@ -54,7 +55,12 @@ good_ecdsa_secp521r1.issuer_key_info.y = util.Hex2Bytes(
     '1b471f02088804f0a9e9bf9b33c7e2081897fa25e10877eb8a4d365e4f6ece77aa4933a89b33cb80187f017e2b08a61e080973bd3e03bd05c6e8ce51cfa0b4e2473'
 )
 
-good_ecdsa_sigs = [good_ecdsa_secp256r1, good_ecdsa_secp521r1]
+good_ecdsa_sigs = [
+    good_ecdsa_secp256r1,
+    good_ecdsa_secp521r1,
+    # Make sure good deterministic ECDSA are not flagged:
+    copy.deepcopy(good_ecdsa_secp256r1),
+]
 
 # An issuer EC key where the words in the private key repeat.
 # The private key is
@@ -157,7 +163,11 @@ bad_ecdsa_cr50u2f_3.issuer_key_info.y = util.Hex2Bytes(
     'a8fe08b031ef8716cbe858d17be56fe4c2891af824ed595c89d42e8a04adab2a')
 
 bad_ecdsa_cr50u2f = [
-    bad_ecdsa_cr50u2f_1, bad_ecdsa_cr50u2f_2, bad_ecdsa_cr50u2f_3
+    bad_ecdsa_cr50u2f_1,
+    bad_ecdsa_cr50u2f_2,
+    bad_ecdsa_cr50u2f_3,
+    # Make sure bad deterministic ECDSA are also flagged:
+    copy.deepcopy(bad_ecdsa_cr50u2f_1),
 ]
 
 # Three signatures with nonces generated using GMP LCG.
@@ -498,8 +508,14 @@ bad_ecdsa_generalized_6.issuer_key_info.y = util.Hex2Bytes(
     'a3fc62804edfe18d11e8d3d4b6c47a15f1d13c3f71bc93756cb8dfa651366b54')
 
 bad_ecdsa_generalized = [
-    bad_ecdsa_generalized_1, bad_ecdsa_generalized_2, bad_ecdsa_generalized_3,
-    bad_ecdsa_generalized_4, bad_ecdsa_generalized_5, bad_ecdsa_generalized_6
+    bad_ecdsa_generalized_1,
+    bad_ecdsa_generalized_2,
+    bad_ecdsa_generalized_3,
+    bad_ecdsa_generalized_4,
+    bad_ecdsa_generalized_5,
+    bad_ecdsa_generalized_6,
+    # Make sure bad deterministic ECDSA are also flagged:
+    copy.deepcopy(bad_ecdsa_generalized_1),
 ]
 
 # Trick to replace CheckECKeySmallDifference default max_diff (tests run faster)
