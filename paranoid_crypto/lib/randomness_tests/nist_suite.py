@@ -883,7 +883,23 @@ def LinearComplexity(bits: int, n: int, block_size: int) -> NamedPValues:
     a pair of p-values. The first p-value is the one described
     by NIST, the second p-value is an additional value that tries
     to catch cases with extreme outliers.
+  Raises:
+    InsufficientDataError: if the size of the input is too small.
   """
+  # Sections 2.10.7 and 3.10 discuss limitiations of the test.
+  # The distribution for the LFSR lengths are exact even for small values of
+  # bits. Hence the test can be performed with small values. NIST is too
+  # conservative here.
+  # For example https://smartfacts.cr.yp.to/smartfacts-20130916.pdf contains
+  # a list of weak primes. Some these primes have patterns that can be easily
+  # recognized even with small block sizes. Thus running the LinearComplexity
+  # test on samples of smaller blocks would be reasonable.
+  if block_size < 10:
+    raise InsufficientDataError("Small block size")
+  # NIST recommends to use at least 200 blocks. The reason for this
+  # recommendation is unclear.
+  if block_size * 200 > n:
+    raise InsufficientDataError("Not enough blocks")
   blocks = util.SplitSequence(bits, n, block_size)
   return LinearComplexityImpl(blocks, block_size)
 
