@@ -16,6 +16,7 @@
 from distutils import spawn
 import os
 
+import platform
 import subprocess
 from pybind11.setup_helpers import build_ext
 from pybind11.setup_helpers import Pybind11Extension
@@ -32,13 +33,35 @@ _BM_CC_HEADERS = [
     'paranoid_crypto/lib/randomness_tests/cc_util/berlekamp_massey.h',
 ]
 
+
+def _get_extra_compile_args():
+  """Return extra compiler flags.
+
+  The compiler flags enable the use of CPU instructions to speed up the code.
+  In particular, the Berlekamp-Massey algorithm can be sped up significantly
+  by using carryless multiplication.
+
+  Returns:
+    platform dependent compiler flags
+  """
+  arch = platform.machine()
+  if arch in ('x86_64', 'AMD64'):
+    # Tries to use _mm_clmulepi64_si128 to speed up Berlekamp-Massey.
+    return ['-mpclmul']
+  elif arch == 'aarch64':
+    # Tries to use vmull_p64 to speed up Berlekamp-Massey.
+    return ['-march=armv8-a+crypto']
+  else:
+    return []
+
+
 _EXT_MODULES = [
     Pybind11Extension(
         'paranoid_crypto.lib.randomness_tests.cc_util.pybind.berlekamp_massey',
         sources=_BM_CC_SOURCES,
         depends=_BM_CC_HEADERS,
         include_dirs=['./'],
-        extra_compile_args=['-mpclmul'])
+        extra_compile_args=_get_extra_compile_args())
 ]
 
 # Tuple of proto message definitions to build Python bindings for. Paths must

@@ -15,9 +15,19 @@
 #include "paranoid_crypto/lib/randomness_tests/cc_util/berlekamp_massey.h"
 
 #ifdef __x86_64__
+#ifdef __CLMUL__
 #include <emmintrin.h>  // SSE2
 #include <wmmintrin.h>  // clmul
 #include <xmmintrin.h>  // Datatype __mm128i
+#define USE_CLMUL
+#endif
+#endif
+
+#ifdef __aarch64__
+#ifdef __ARM_NEON
+#include <arm_neon.h>
+#define USE_CLMUL
+#endif
 #endif
 
 #include <string>
@@ -25,8 +35,8 @@
 
 namespace paranoid_crypto::lib::randomness_tests::cc_util {
 
+#ifdef USE_CLMUL
 #ifdef __x86_64__
-
 #define _mm_extract_epi64(x, imm) \
   _mm_cvtsi128_si64(_mm_srli_si128((x), 8 * (imm)))
 
@@ -37,6 +47,16 @@ inline void clmul(uint64_t x, uint64_t y, uint64_t *hi, uint64_t *lo) {
   *hi = _mm_extract_epi64(tmp, 1);
   *lo = _mm_extract_epi64(tmp, 0);
 }
+#endif
+#ifdef __aarch64__
+#ifdef __ARM_NEON
+inline void clmul(uint64_t x, uint64_t y, uint64_t *hi, uint64_t *lo) {
+  poly128_t t = vmull_p64(x, y);
+  *hi = static_cast<uint64_t>(t >> 64);
+  *lo = static_cast<uint64_t>(t);
+}
+#endif
+#endif
 
 // Implements the Berlekamp-Massey algorithm for binary sequences.
 //
