@@ -33,7 +33,7 @@ def Int2Bytes(int_val: int) -> bytes:
 
 
 def GetHighestSeverity(test_info: paranoid_pb2.TestInfo) -> Optional[int]:
-  """Returns the highest severity from all failed tests stored in test_info.
+  """Return the highest severity from all failed tests stored in test_info.
 
   Args:
     test_info: An instance of paranoid_pb2.TestInfo protobuf, where the highest
@@ -50,9 +50,11 @@ def GetHighestSeverity(test_info: paranoid_pb2.TestInfo) -> Optional[int]:
   return highest_severity if highest_severity != -1 else None
 
 
-def GetTestResult(test_info: paranoid_pb2.TestInfo,
-                  test_name: str) -> Optional[paranoid_pb2.TestResultsEntry]:
-  """Resturns a test result stored in test_info with name test_name.
+def GetTestResult(
+  test_info: paranoid_pb2.TestInfo,
+  test_name: str
+) -> Optional[paranoid_pb2.TestResultsEntry]:
+  """Return test result associated with the given parameters.
 
   Args:
     test_info: An instance of paranoid_pb2.TestInfo protobuf, where a test
@@ -70,9 +72,11 @@ def GetTestResult(test_info: paranoid_pb2.TestInfo,
   return None
 
 
-def SetTestResult(test_info: paranoid_pb2.TestInfo,
-                  test_result: paranoid_pb2.TestResultsEntry):
-  """Adds or updates test results in a paranoid_pb2.TestInfo protobuf.
+def SetTestResult(
+  test_info: paranoid_pb2.TestInfo,
+  test_result: paranoid_pb2.TestResultsEntry
+):
+  """Add or update test results in a paranoid_pb2.TestInfo protobuf.
 
   Args:
     test_info: An instance of paranoid_pb2.TestInfo protobuf, where test_results
@@ -97,7 +101,7 @@ def SetTestResult(test_info: paranoid_pb2.TestInfo,
 
 def GetAttachedInfo(test_info: paranoid_pb2.TestInfo,
                     info_name: str) -> Optional[paranoid_pb2.AttachedInfoEntry]:
-  """Resturns an info stored in test_info.attached_info with info_name.
+  """Return info stored in test_info attached_info with provided name.
 
   Args:
     test_info: An instance of paranoid_pb2.TestInfo protobuf, where an attached
@@ -115,7 +119,7 @@ def GetAttachedInfo(test_info: paranoid_pb2.TestInfo,
 
 
 def AttachInfo(test_info: paranoid_pb2.TestInfo, info_name: str, value: str):
-  """Attachs a test result information in a paranoid_pb2.TestInfo protobuf.
+  """Attach test result information in a paranoid_pb2.TestInfo protobuf.
 
   Args:
     test_info: An instance of paranoid_pb2.TestInfo protobuf, where
@@ -135,7 +139,7 @@ def AttachInfo(test_info: paranoid_pb2.TestInfo, info_name: str, value: str):
 
 def GetAttachedFactors(test_info: paranoid_pb2.TestInfo,
                        info_name: str) -> Optional[set[int]]:
-  """Resturns a set of factors stored in test_info.attached_info with info_name.
+  """Return a set of factors stored in test_info.attached_info with info_name.
 
   Args:
     test_info: An instance of paranoid_pb2.TestInfo protobuf, where a set of
@@ -155,11 +159,11 @@ def GetAttachedFactors(test_info: paranoid_pb2.TestInfo,
 
 def AttachFactors(test_info: paranoid_pb2.TestInfo, info_name: str,
                   factors: Iterable[int]):
-  """Attachs a set of factors in test_info.attached_info with info_name.
+  """Attach a set of factors in test_info.attached_info with info_name.
 
   If the set factors does not exist yet, it creates a new one. If the set
   exists, it is updated (e.g., new factors are added). Consistency is not
-  critical and it does not contain any logic. If one first attachs {2, 3} and
+  critical and it does not contain any logic. If one first attaches {2, 3} and
   {6} later, the final set will be {2, 3, 6}, i.e., it does not recognize that
   they are the same. Also, it does not store repeated values. E.g., factors of
   12 may be stored as {2, 3}, not [2, 2, 3].
