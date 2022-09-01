@@ -19,6 +19,7 @@ weaknesses. It does pure math verifications and can be used for in a pipeline.
 import collections
 import enum
 import time
+from typing import TypeVar
 from absl import logging
 from paranoid_crypto import paranoid_pb2
 from paranoid_crypto.lib import base_check
@@ -27,6 +28,8 @@ from paranoid_crypto.lib import ec_single_checks
 from paranoid_crypto.lib import ecdsa_sig_checks
 from paranoid_crypto.lib import rsa_aggregate_checks
 from paranoid_crypto.lib import rsa_single_checks
+
+T = TypeVar("T")
 
 _ACTIVE_EC_SINGLE_CHECKS = (
     ec_single_checks.CheckValidECKey,
@@ -82,7 +85,7 @@ _ECDSA_ALL = "ecdsa_all"
 _check_factory = collections.defaultdict(dict)
 
 
-def GetRSASingleChecks() -> dict[str, base_check.BaseCheck]:
+def GetRSASingleChecks() -> dict[str, base_check.RSAKeyCheck]:
   if not _check_factory[_RSA_SINGLES]:
     for test_class in _ACTIVE_RSA_SINGLE_CHECKS:
       check = test_class()
@@ -90,7 +93,7 @@ def GetRSASingleChecks() -> dict[str, base_check.BaseCheck]:
   return _check_factory[_RSA_SINGLES]
 
 
-def GetRSAAggregateChecks() -> dict[str, base_check.BaseCheck]:
+def GetRSAAggregateChecks() -> dict[str, base_check.RSAKeyCheck]:
   if not _check_factory[_RSA_AGGREGATES]:
     for test_class in _ACTIVE_RSA_AGGREGATE_CHECKS:
       check = test_class()
@@ -98,14 +101,14 @@ def GetRSAAggregateChecks() -> dict[str, base_check.BaseCheck]:
   return _check_factory[_RSA_AGGREGATES]
 
 
-def GetRSAAllChecks() -> dict[str, base_check.BaseCheck]:
+def GetRSAAllChecks() -> dict[str, base_check.RSAKeyCheck]:
   if not _check_factory[_RSA_ALL]:
     _check_factory[_RSA_ALL].update(GetRSASingleChecks())
     _check_factory[_RSA_ALL].update(GetRSAAggregateChecks())
   return _check_factory[_RSA_ALL]
 
 
-def GetECSingleChecks() -> dict[str, base_check.BaseCheck]:
+def GetECSingleChecks() -> dict[str, base_check.ECKeyCheck]:
   if not _check_factory[_EC_SINGLES]:
     for test_class in _ACTIVE_EC_SINGLE_CHECKS:
       check = test_class()
@@ -113,7 +116,7 @@ def GetECSingleChecks() -> dict[str, base_check.BaseCheck]:
   return _check_factory[_EC_SINGLES]
 
 
-def GetECAggregateChecks() -> dict[str, base_check.BaseCheck]:
+def GetECAggregateChecks() -> dict[str, base_check.ECKeyCheck]:
   if not _check_factory[_EC_AGGREGATES]:
     for test_class in _ACTIVE_EC_AGGREGATE_CHECKS:
       check = test_class()
@@ -121,14 +124,14 @@ def GetECAggregateChecks() -> dict[str, base_check.BaseCheck]:
   return _check_factory[_EC_AGGREGATES]
 
 
-def GetECAllChecks() -> dict[str, base_check.BaseCheck]:
+def GetECAllChecks() -> dict[str, base_check.ECKeyCheck]:
   if not _check_factory[_EC_ALL]:
     _check_factory[_EC_ALL].update(GetECSingleChecks())
     _check_factory[_EC_ALL].update(GetECAggregateChecks())
   return _check_factory[_EC_ALL]
 
 
-def GetECDSAAllChecks() -> dict[str, base_check.BaseCheck]:
+def GetECDSAAllChecks() -> dict[str, base_check.ECDSASignatureCheck]:
   if not _check_factory[_ECDSA_ALL]:
     for test_class in _ACTIVE_ECDSA_SIG_CHECKS:
       check = test_class()
@@ -142,8 +145,8 @@ class _State(enum.Enum):
   FAILED = 2
 
 
-def _CheckArtifacts(artifacts: base_check.ArtifactListType,
-                    check_items: list[tuple[str, base_check.BaseCheck]],
+def _CheckArtifacts(artifacts: list[T],
+                    check_items: list[tuple[str, base_check.BaseCheck[T]]],
                     log_level: int) -> bool:
   """Generic function for testing artifacts.
 

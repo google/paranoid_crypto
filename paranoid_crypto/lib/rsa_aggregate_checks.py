@@ -22,7 +22,7 @@ from paranoid_crypto.lib import rsa_util
 from paranoid_crypto.lib import util
 
 
-class CheckGCD(base_check.BaseCheck):
+class CheckGCD(base_check.RSAKeyCheck):
   """Runs GCD checks among artifacts."""
 
   def __init__(self):
@@ -46,7 +46,7 @@ class CheckGCD(base_check.BaseCheck):
     return any_weak
 
 
-class CheckGCDN1(base_check.BaseCheck):
+class CheckGCDN1(base_check.RSAKeyCheck):
   """Runs GCD n-1 checks among artifacts.
 
   This test finds pairs of key with moduli n1 and n2 that have the property

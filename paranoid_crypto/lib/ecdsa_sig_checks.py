@@ -57,7 +57,7 @@ def _IssuerDLogs(guesses: list[int], pks: dict[tuple[int, int], list[int]],
   return issuer_dlogs
 
 
-class BiasedBaseCheck(base_check.BaseCheck):
+class BiasedBaseCheck(base_check.ECDSASignatureCheck):
   """Base class for checks whether signatures have biased nonces."""
 
   def __init__(self,
@@ -191,7 +191,7 @@ class CheckNonceGeneralized(BiasedBaseCheck):
     super().__init__(bias=hnp.Bias.GENERALIZED)
 
 
-class CheckIssuerKey(base_check.BaseCheck):
+class CheckIssuerKey(base_check.ECDSASignatureCheck):
   """Checks whether the signature issuer public keys are weak.
 
   Runs all EC key tests against the issuer public keys. For this check we set
@@ -233,7 +233,7 @@ class CheckIssuerKey(base_check.BaseCheck):
     return any_weak
 
 
-class CheckCr50U2f(base_check.BaseCheck):
+class CheckCr50U2f(base_check.ECDSASignatureCheck):
   """Checks whether the signatures use weak nonces like in the CR50 U2F flaw."""
 
   def __init__(self):

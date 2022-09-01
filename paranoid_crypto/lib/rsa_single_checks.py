@@ -31,7 +31,7 @@ from paranoid_crypto.lib.data import default_storage
 from paranoid_crypto.lib.data import storage
 
 
-class CheckSizes(base_check.BaseCheck):
+class CheckSizes(base_check.RSAKeyCheck):
   """Runs modulus size checks on the input RSA keys (artifacts)."""
 
   def __init__(self):
@@ -52,7 +52,7 @@ class CheckSizes(base_check.BaseCheck):
     return any_weak
 
 
-class CheckExponents(base_check.BaseCheck):
+class CheckExponents(base_check.RSAKeyCheck):
   """Runs exponent checks on the input RSA keys (artifacts)."""
 
   def __init__(self):
@@ -72,7 +72,7 @@ class CheckExponents(base_check.BaseCheck):
     return any_weak
 
 
-class CheckROCA(base_check.BaseCheck):
+class CheckROCA(base_check.RSAKeyCheck):
   """Runs ROCA check on the input RSA keys (artifacts).
 
   Attributes:
@@ -96,7 +96,7 @@ class CheckROCA(base_check.BaseCheck):
     return any_weak
 
 
-class CheckROCAVariant(base_check.BaseCheck):
+class CheckROCAVariant(base_check.RSAKeyCheck):
   """Runs check for ROCA variants on the input RSA keys (artifacts).
 
   Attributes:
@@ -121,7 +121,7 @@ class CheckROCAVariant(base_check.BaseCheck):
     return any_weak
 
 
-class CheckFermat(base_check.BaseCheck):
+class CheckFermat(base_check.RSAKeyCheck):
   """Runs quick Fermat checks on the input RSA keys (artifacts)."""
 
   def __init__(self, max_steps: Optional[int] = 100000):
@@ -148,7 +148,7 @@ class CheckFermat(base_check.BaseCheck):
     return any_weak
 
 
-class CheckHighAndLowBitsEqual(base_check.BaseCheck):
+class CheckHighAndLowBitsEqual(base_check.RSAKeyCheck):
   """Runs a check that factors key if enough bits of p and q are equal.
 
   This test is similar to Fermat, but with the difference that it tries
@@ -177,7 +177,7 @@ class CheckHighAndLowBitsEqual(base_check.BaseCheck):
     return any_weak
 
 
-class CheckOpensslDenylist(base_check.BaseCheck):
+class CheckOpensslDenylist(base_check.RSAKeyCheck):
   """Checks Debian OpenSSL Predictable Pseudo Random Number Generator."""
 
   def __init__(self, paranoid_storage: Optional[storage.Storage] = None):
@@ -208,7 +208,7 @@ class CheckOpensslDenylist(base_check.BaseCheck):
     return any_weak
 
 
-class CheckContinuedFractions(base_check.BaseCheck):
+class CheckContinuedFractions(base_check.RSAKeyCheck):
   """Runs continued fractions checks on the input RSA keys (artifacts)."""
 
   def __init__(self, bound: Optional[int] = 2**48):
@@ -245,7 +245,7 @@ class CheckContinuedFractions(base_check.BaseCheck):
     return any_weak
 
 
-class CheckBitPatterns(base_check.BaseCheck):
+class CheckBitPatterns(base_check.RSAKeyCheck):
   """Tries to find factors of RSA keys with a repeating bit pattern.
 
   The factoring algorithm tries to find repeating bit patterns for a list
@@ -306,7 +306,7 @@ class CheckBitPatterns(base_check.BaseCheck):
     return any_weak
 
 
-class CheckPermutedBitPatterns(base_check.BaseCheck):
+class CheckPermutedBitPatterns(base_check.RSAKeyCheck):
   """Tries to find factors of RSA keys with a repeating permuted bit pattern.
 
   This method tries to find primes that have patterns similar to the ones
@@ -393,7 +393,7 @@ class CheckPermutedBitPatterns(base_check.BaseCheck):
     return any_weak
 
 
-class CheckPollardpm1(base_check.BaseCheck):
+class CheckPollardpm1(base_check.RSAKeyCheck):
   """Runs checks using Pollard's p-1 factorization algorithm."""
 
   def __init__(self, bound: Optional[int] = None):
@@ -443,7 +443,7 @@ class CheckPollardpm1(base_check.BaseCheck):
     return any_weak
 
 
-class CheckLowHammingWeight(base_check.BaseCheck):
+class CheckLowHammingWeight(base_check.RSAKeyCheck):
   """Runs checks for keys that are products of low Hamming weight primes."""
 
   def __init__(self):
@@ -474,7 +474,7 @@ class CheckLowHammingWeight(base_check.BaseCheck):
     return any_weak
 
 
-class CheckUnseededRand(base_check.BaseCheck):
+class CheckUnseededRand(base_check.RSAKeyCheck):
   """Checks if the RSA keys were generated with unseeded PRNGs."""
 
   def __init__(self, paranoid_storage: Optional[storage.Storage] = None):
@@ -515,7 +515,7 @@ class CheckUnseededRand(base_check.BaseCheck):
     return any_weak
 
 
-class CheckSmallUpperDifferences(base_check.BaseCheck):
+class CheckSmallUpperDifferences(base_check.RSAKeyCheck):
   """Factors keys when the difference abs(p - q) is predictable."""
 
   def __init__(self):
@@ -536,7 +536,7 @@ class CheckSmallUpperDifferences(base_check.BaseCheck):
     return any_weak
 
 
-class CheckKeypairDenylist(base_check.BaseCheck):
+class CheckKeypairDenylist(base_check.RSAKeyCheck):
   """Checks Keypair CVE-2021-41117 vulnerability.
 
   Using the data provided by default_storage it's possible to detect up to

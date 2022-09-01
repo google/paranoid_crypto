@@ -13,17 +13,13 @@
 # limitations under the License.
 """Module containing base class to be inherited by Paranoid check classes."""
 
-from typing import Optional, Union
+from typing import Generic, Optional, TypeVar
 from paranoid_crypto import paranoid_pb2
 
-# Type annotations covering the different types of crypto artfifacts
-KeyListType = Union[list[paranoid_pb2.RSAKey], list[paranoid_pb2.ECKey]]
-SigListType = Union[list[paranoid_pb2.RSASignature],
-                    list[paranoid_pb2.ECDSASignature]]
-ArtifactListType = Union[KeyListType, SigListType]
+T = TypeVar("T")
 
 
-class BaseCheck(object):
+class BaseCheck(Generic[T]):
   """Base class for Paranoid checks.
 
   Attributes:
@@ -64,7 +60,7 @@ class BaseCheck(object):
     return paranoid_pb2.TestResultsEntry(
         severity=self.severity, test_name=self.check_name, result=False)
 
-  def Check(self, artifacts: ArtifactListType) -> bool:
+  def Check(self, artifacts: list[T]) -> bool:
     """Runs the check among the artifacts (keys/signatures).
 
     Args:
@@ -74,3 +70,19 @@ class BaseCheck(object):
       A boolean indicating if at least one of the keys/signatures is weak.
     """
     raise NotImplementedError("Subclass didn't implement Check method.")
+
+
+class RSAKeyCheck(BaseCheck[paranoid_pb2.RSAKey]):
+  """Base class for RSA key checks."""
+
+
+class RSASignatureCheck(BaseCheck[paranoid_pb2.RSASignature]):
+  """Base class for RSA signature checks."""
+
+
+class ECKeyCheck(BaseCheck[paranoid_pb2.ECKey]):
+  """Base class for EC key checks."""
+
+
+class ECDSASignatureCheck(BaseCheck[paranoid_pb2.ECDSASignature]):
+  """Base class for ECDSA signature checks."""

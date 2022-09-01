@@ -21,7 +21,7 @@ from paranoid_crypto.lib import ec_util
 from paranoid_crypto.lib import util
 
 
-class CheckValidECKey(base_check.BaseCheck):
+class CheckValidECKey(base_check.ECKeyCheck):
   """Checks whether the public keys are valid.
 
   The key is considered valid if:
@@ -58,7 +58,7 @@ class CheckValidECKey(base_check.BaseCheck):
     return any_weak
 
 
-class CheckWeakCurve(base_check.BaseCheck):
+class CheckWeakCurve(base_check.ECKeyCheck):
   """Checks whether weak curves are used.
 
   A curve is considered weak if discrete logarithms take significantly
@@ -88,7 +88,7 @@ class CheckWeakCurve(base_check.BaseCheck):
     return any_weak
 
 
-class CheckWeakECPrivateKey(base_check.BaseCheck):
+class CheckWeakECPrivateKey(base_check.ECKeyCheck):
   """Checks if any keys use a weak private key.
 
   This method checks whether there are any keys where the private key is

@@ -21,7 +21,7 @@ from paranoid_crypto.lib import ec_util
 from paranoid_crypto.lib import util
 
 
-class CheckECKeySmallDifference(base_check.BaseCheck):
+class CheckECKeySmallDifference(base_check.ECKeyCheck):
   """Checks if the difference of two private keys is small.
 
   This check does not find discrete logarithms. It merely finds relations
