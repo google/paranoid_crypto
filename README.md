@@ -55,9 +55,10 @@ course much more difficult than detecting known ones. Such detections may
 require large sets of artifacts or find weak ones only with a low probability.
 
 Therefore, we are very interested to receive feedback and learn about the
-cryptographic library that generated weak cryptographic artifacts. The project
-is constantly work in progress. After learning about weak implementations the
-plan is to analyze and add detections targeting them.
+cryptographic library that generated weak cryptographic artifacts (See [call for
+contributions](https://security.googleblog.com/2022/08/announcing-open-sourcing-of-paranoids.html)
+). The project is constantly work in progress. After learning about weak
+implementations the plan is to analyze and add detections targeting them.
 
 ## Getting Started
 
@@ -127,6 +128,33 @@ Ran 305 tests in 307.555s
 
 OK
 ```
+
+## Preliminary results
+
+Similar to other published works, we have been analyzing the crypto artifacts
+from [Certificate Transparency (CT)](https://certificate.transparency.dev),
+which logs issued website certificates since 2013 with the goal of making them
+transparent and verifiable. Its database contains more than 7 billion
+certificates as of September 2022. For the Paranoid checks of EC public keys and
+ECDSA signatures, so far, we have not found any weak artifacts in CT. For the
+RSA public key checks with severities high or critical, we have the following
+results:
+
+|       **TestName**       | **Potentially Related CVEs** |    **Severity**   | **Number of Weak Artifacts** |
+|:------------------------:|:----------------------------:|:-----------------:|:----------------------------:|
+|   CheckOpensslDenylist   |         CVE-2008-0166        | SEVERITY_CRITICAL |             3989             |
+|         CheckROCA        |        CVE-2017-15361        |   SEVERITY_HIGH   |             2875             |
+|         CheckGCD         |               -              | SEVERITY_CRITICAL |             1860             |
+|        CheckFermat       |        CVE-2022-26320        | SEVERITY_CRITICAL |              36              |
+|  CheckContinuedFractions |               -              | SEVERITY_CRITICAL |              16              |
+|     CheckBitPatterns     |               -              | SEVERITY_CRITICAL |               6              |
+| CheckPermutedBitPatterns |               -              | SEVERITY_CRITICAL |               6              |
+|   CheckKeypairDenylist   |        CVE-2021-41117        | SEVERITY_CRITICAL |               4              |
+|      CheckPollardpm1     |               -              | SEVERITY_CRITICAL |               1              |
+
+Some of these certificates were already expired or revoked. For the ones that
+were still active (most of the CheckGCD ones), we immediately reported them to
+the Certificate Authorities to be revoked.
 
 ## ABOUT
 
