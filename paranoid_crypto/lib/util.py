@@ -16,6 +16,7 @@ import ast
 from collections.abc import Iterable
 from typing import Optional
 from paranoid_crypto import paranoid_pb2
+from paranoid_crypto import version
 
 
 def Hex2Bytes(hexstr_val: str) -> bytes:
@@ -76,10 +77,17 @@ def SetTestResult(test_info: paranoid_pb2.TestInfo,
 
   Args:
     test_info: An instance of paranoid_pb2.TestInfo protobuf, where test_results
-      attribute will be modified to store a test_result.
+      attribute will be modified to store a test_result and paranoid_lib_version
+      attribute will reflect the current library version that ran the tests.
     test_result: An instance of paranoid_pb2.TestResultsEntry, to be
       stored/updated in test_info.
   """
+  if not test_info.paranoid_lib_version:
+    # Stores version value in test_info. As checks can be updated and become
+    # stronger, this attribute can be useful to know when it makes sense to
+    # re-execute a check against a crypto artifact.
+    test_info.paranoid_lib_version = version.__version__
+
   if test_result.result:
     # When a key/signature is vulnerable to at least one test,
     # paranoid_pb2.TestInfo.weak should reflect that. We never set it to False,

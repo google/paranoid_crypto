@@ -42,6 +42,10 @@ class ParanoidBaseTest(absltest.TestCase):
       if res_entry is None:
         self.fail('None test result.')
       self.assertEqual(res_entry.result, weak)
+      self.assertRegex(
+          proto.test_info.paranoid_lib_version,
+          r'^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$'
+      )
 
   def assertSeverities(self, protos, check_name, severity):
     for proto in protos:

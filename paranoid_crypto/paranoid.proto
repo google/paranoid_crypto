@@ -146,7 +146,7 @@ message TestInfo {
   repeated AttachedInfoEntry attached_info = 4;
 
   // Specifies the lib build version that ran the tests.
-  int32 paranoid_lib_version = 5;
+  string paranoid_lib_version = 5;
 }
 
 // The messages below are intended to be used in code level.
