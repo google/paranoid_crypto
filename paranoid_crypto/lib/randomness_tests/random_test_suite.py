@@ -264,22 +264,22 @@ def LogTotal(tests: list[TestStructure]) -> None:
                    num_total_tests)
 
 
-def TestSource(source_name: str,
-               source: Source,
+def TestSource(source: Source,
                n: int,
-               significance_level_repeat: float,
-               significance_level_fail: float,
+               significance_level_repeat: float = 0.01,
+               significance_level_fail: float = 1e-9,
+               source_name: Optional[str] = None,
                test_prefix: Optional[str] = None,
                log_level: int = 1,
                min_repetitions: int = 1) -> bool:
   """Tests random bit generator.
 
   Args:
-    source_name: describes the source of the random bits.
     source: a pseudorandom generator
     n: the length of the bit string.
     significance_level_repeat: a p-value for which the test is repeated.
     significance_level_fail: a p-value lower than this value fails the test.
+    source_name: describes the source of the random bits.
     test_prefix: only runs tests that start with test_prefix. If this value is
       None then all suitable tests are run.
     log_level: 0: only prints failing values of tests with multiple p-values
@@ -288,7 +288,7 @@ def TestSource(source_name: str,
     min_repetitions: minimal number of repetitions
 
   Returns:
-    False, if any of the tests fail.
+    True, if any of the tests fail.
   """
 
   if source_name:
@@ -329,19 +329,19 @@ def TestSource(source_name: str,
   return any(test.Failed() for test in tests)
 
 
-def TestBitString(source_name: str,
-                  bits: int,
+def TestBitString(bits: int,
                   n: int,
-                  significance_level: float,
+                  significance_level: float = 1e-9,
+                  source_name: Optional[str] = None,
                   test_prefix: Optional[str] = None,
                   log_level: int = 1) -> bool:
   """Runs all tests on a long consecutive output of a random bit generator.
 
   Args:
-    source_name: describes the source of the random bits.
     bits: the bit string to test.
     n: the length of the bit string.
     significance_level: a p-value lower than this value fails the test.
+    source_name: describes the source of the random bits.
     test_prefix: only runs tests that start with test_prefix. If this value is
       None then all suitable tests are run.
     log_level: 0: only prints failing values of tests with multiple p-values
@@ -349,7 +349,7 @@ def TestBitString(source_name: str,
                2: prints all p-values
 
   Returns:
-    False, if any of the tests fail.
+    True, if any of the tests fail.
   """
   if source_name:
     logging.info("-------- Testing: %s --------", source_name)

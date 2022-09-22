@@ -60,10 +60,9 @@ def test_source(prng_name: str) -> None:
   significance_level_fail = _SIGNIFICANCE_LEVEL_FAIL.value
   min_repetitions = _MIN_REPETITIONS.value
   result_level = _RESULT_LEVEL.value
-  random_test_suite.TestSource(prng_name, prng.RandomBits, size,
-                               significance_level_repeat,
-                               significance_level_fail, test, result_level,
-                               min_repetitions)
+  random_test_suite.TestSource(prng.RandomBits, size, significance_level_repeat,
+                               significance_level_fail, prng_name, test,
+                               result_level, min_repetitions)
 
 
 def test_sources() -> None:

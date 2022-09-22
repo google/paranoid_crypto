@@ -54,11 +54,11 @@ Step 2: Calling the test suite.
 
 ```python
 randomness_tests.TestSource(
-    source_name="MyPrng",
     source = MyPrng,
     n = 10000000,
     significance_level_repeat = 0.01,
-    significance_level_fail = 1e-9)
+    significance_level_fail = 1e-9,
+    source_name="MyPrng")
 ```
 
 There are plans to add additional interfaces to better support different use
