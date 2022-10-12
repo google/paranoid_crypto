@@ -32,7 +32,7 @@ enum OriginType {
   ORIGIN_KMS_RSA = 11;
 }
 
-// Next ID to use: 12
+// Next ID to use: 19
 enum SignatureAlgorithm {
   ALGORITHM_UNKNOWN = 0;
   RSA_WITH_MD5 = 1;
@@ -46,7 +46,13 @@ enum SignatureAlgorithm {
   ECDSA_WITH_SHA256 = 9;
   ECDSA_WITH_SHA384 = 10;
   ECDSA_WITH_SHA512 = 11;
-  // TODO(pedroysb): Include more signature algorithms (e.g., RSA_WITH_MD4).
+  RSA_PSS = 12;  // When the hash isn't explicit
+  RSA_PSS_MD5 = 13;
+  RSA_PSS_SHA1 = 14;
+  RSA_PSS_SHA224 = 15;
+  RSA_PSS_SHA256 = 16;
+  RSA_PSS_SHA384 = 17;
+  RSA_PSS_SHA512 = 18;
 }
 
 // Next ID to use: 20
