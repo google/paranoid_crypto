@@ -64,7 +64,7 @@ class LcgConstants(TypedDict, total=False):
   # A list of pairs (c, d) allowing to detect the LCG.
   constants: ConstantList
 
-SECP256R1_GMP32 = {
+SECP256R1_GMP32: LcgConstants = {
     'curve':
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     'lcg':
@@ -119,7 +119,7 @@ SECP256R1_GMP32 = {
     ]
 }
 
-SECP256R1_GMP40 = {
+SECP256R1_GMP40: LcgConstants = {
     'curve':
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     'lcg':
@@ -170,7 +170,7 @@ SECP256R1_GMP40 = {
     ]
 }
 
-SECP256R1_GMP64 = {
+SECP256R1_GMP64: LcgConstants = {
     'curve':
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     'lcg':
@@ -217,7 +217,7 @@ SECP256R1_GMP64 = {
     ]
 }
 
-SECP256R1_GMP128 = {
+SECP256R1_GMP128: LcgConstants = {
     'curve':
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     'lcg':
@@ -256,7 +256,7 @@ SECP256R1_GMP128 = {
     ]
 }
 
-SECP256R1_GMP196 = {
+SECP256R1_GMP196: LcgConstants = {
     'curve':
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     'lcg':
@@ -295,7 +295,7 @@ SECP256R1_GMP196 = {
     ]
 }
 
-SECP256R1_GMP200 = {
+SECP256R1_GMP200: LcgConstants = {
     'curve':
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     'lcg':
@@ -334,7 +334,7 @@ SECP256R1_GMP200 = {
     ]
 }
 
-SECP256R1_JAVA_UTIL_RANDOM = {
+SECP256R1_JAVA_UTIL_RANDOM: LcgConstants = {
     'curve':
         paranoid_pb2.CurveType.CURVE_SECP256R1,
     'lcg':
@@ -490,7 +490,7 @@ SECP256R1_JAVA_UTIL_RANDOM = {
     ]
 }
 
-SECP256K1_JAVA_UTIL_RANDOM = {
+SECP256K1_JAVA_UTIL_RANDOM: LcgConstants = {
     'curve':
         paranoid_pb2.CurveType.CURVE_SECP256K1,
     'lcg':
@@ -637,7 +637,7 @@ SECP256K1_JAVA_UTIL_RANDOM = {
     ]
 }
 
-SECP384R1_GMP32 = {
+SECP384R1_GMP32: LcgConstants = {
     'curve':
         paranoid_pb2.CurveType.CURVE_SECP384R1,
     'lcg':
@@ -724,7 +724,7 @@ SECP384R1_GMP32 = {
     ]
 }
 
-SECP384R1_GMP40 = {
+SECP384R1_GMP40: LcgConstants = {
     'curve':
         paranoid_pb2.CurveType.CURVE_SECP384R1,
     'lcg':
@@ -796,7 +796,7 @@ SECP384R1_GMP40 = {
     ]
 }
 
-SECP384R1_GMP56 = {
+SECP384R1_GMP56: LcgConstants = {
     'curve':
         paranoid_pb2.CurveType.CURVE_SECP384R1,
     'lcg':
@@ -859,7 +859,7 @@ SECP384R1_GMP56 = {
     ]
 }
 
-SECP384R1_GMP64 = {
+SECP384R1_GMP64: LcgConstants = {
     'curve':
         paranoid_pb2.CurveType.CURVE_SECP384R1,
     'lcg':
@@ -916,7 +916,7 @@ SECP384R1_GMP64 = {
     ]
 }
 
-SECP384R1_GMP100 = {
+SECP384R1_GMP100: LcgConstants = {
     'curve':
         paranoid_pb2.CurveType.CURVE_SECP384R1,
     'lcg':
@@ -973,7 +973,7 @@ SECP384R1_GMP100 = {
     ]
 }
 
-SECP384R1_GMP128 = {
+SECP384R1_GMP128: LcgConstants = {
     'curve':
         paranoid_pb2.CurveType.CURVE_SECP384R1,
     'lcg':
@@ -1024,7 +1024,7 @@ SECP384R1_GMP128 = {
     ]
 }
 
-SECP384R1_GMP156 = {
+SECP384R1_GMP156: LcgConstants = {
     'curve':
         paranoid_pb2.CurveType.CURVE_SECP384R1,
     'lcg':
@@ -1076,7 +1076,7 @@ SECP384R1_GMP156 = {
     ]
 }
 
-SECP384R1_GMP196 = {
+SECP384R1_GMP196: LcgConstants = {
     'curve':
         paranoid_pb2.CurveType.CURVE_SECP384R1,
     'lcg':
@@ -1127,7 +1127,7 @@ SECP384R1_GMP196 = {
     ]
 }
 
-SECP384R1_GMP200 = {
+SECP384R1_GMP200: LcgConstants = {
     'curve':
         paranoid_pb2.CurveType.CURVE_SECP384R1,
     'lcg':
@@ -1178,7 +1178,7 @@ SECP384R1_GMP200 = {
     ]
 }
 
-SECP384R1_GMP256 = {
+SECP384R1_GMP256: LcgConstants = {
     'curve':
         paranoid_pb2.CurveType.CURVE_SECP384R1,
     'lcg':
@@ -1223,7 +1223,7 @@ SECP384R1_GMP256 = {
     ]
 }
 
-CONSTANT_FACTORY = [
+CONSTANT_FACTORY: list[LcgConstants] = [
     SECP256R1_GMP32,
     SECP256R1_GMP40,
     SECP256R1_GMP64,
