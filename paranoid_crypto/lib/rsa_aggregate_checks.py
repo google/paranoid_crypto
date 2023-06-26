@@ -14,7 +14,7 @@
 """Module containing Paranoid checks on group of RSA keys by aggregation."""
 
 from absl import logging
-import gmpy2 as gmpy
+import gmpy
 from paranoid_crypto import paranoid_pb2
 from paranoid_crypto.lib import base_check
 from paranoid_crypto.lib import consts

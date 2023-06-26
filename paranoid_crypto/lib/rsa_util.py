@@ -15,7 +15,7 @@
 
 import heapq
 from typing import Optional
-import gmpy2 as gmpy
+import gmpy
 from paranoid_crypto.lib import lll
 from paranoid_crypto.lib import ntheory_util
 from paranoid_crypto.lib import special_case_factoring
@@ -74,7 +74,7 @@ def FermatFactor(n: int, max_steps: int) -> Optional[tuple[int, int]]:
   if n % 2 == 0:
     return 2, n // 2
 
-  a = gmpy.isqrt(n)
+  a = gmpy.sqrt(n)
   if a * a == n:
     return a, a
 
@@ -83,7 +83,7 @@ def FermatFactor(n: int, max_steps: int) -> Optional[tuple[int, int]]:
 
   for _ in range(max_steps):
     if gmpy.is_square(b2):
-      return a + gmpy.isqrt(b2), a - gmpy.isqrt(b2)
+      return a + gmpy.sqrt(b2), a - gmpy.sqrt(b2)
 
     # or a += 1; b2 = a * a - n
     b2 += a
@@ -169,7 +169,7 @@ def FactorHighAndLowBitsEqual(n: int,
     raise ArithmeticError("expecting that square root exists")
 
   # approximation of (p+q)/2 if p is close to q.
-  a = gmpy.isqrt(n - 1) + 1
+  a = gmpy.sqrt(n - 1) + 1
   for r in [r0, 2**k - r0]:
     s = a
     for i in range(k):
@@ -187,7 +187,7 @@ def FactorHighAndLowBitsEqual(n: int,
           s += 2**(i - m)
           d = s**2 - n
           if gmpy.is_square(d):
-            d_sqrt = gmpy.isqrt(d)
+            d_sqrt = gmpy.sqrt(d)
             return [s - d_sqrt, s + d_sqrt]
       # Loop invariants:
       # assert (s - r) % 2**i == 0
@@ -284,7 +284,7 @@ def CheckContinuedFraction(n: int, bound: int) -> tuple[bool, list[int]]:
     r, c = ntheory_util.DivmodRounded(n * v, x)
     a, b = ntheory_util.DivmodRounded(r, x)
     if a and c and gmpy.is_square(b * b - 4 * a * c):
-      t = gmpy.isqrt(b * b - 4 * a * c)
+      t = gmpy.sqrt(b * b - 4 * a * c)
       for rt in (t, -t):
         p = gmpy.gcd(n, 2 * a * x + b + rt)
         if 1 < p < n:
@@ -408,7 +408,7 @@ def CheckSmallUpperDifferences(n: int) -> Optional[list[int]]:
   ]
   for diff in differences:
     # find an approximation p0 for p such that p - n // q is approx. diff.
-    p0 = gmpy.isqrt(n + (diff // 2)**2) + diff // 2
+    p0 = gmpy.sqrt(n + (diff // 2)**2) + diff // 2
     factors = special_case_factoring.FactorWithGuess(n, p0)
     if factors:
       return factors

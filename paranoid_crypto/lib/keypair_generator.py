@@ -21,7 +21,7 @@ import hashlib
 from cryptography.hazmat.primitives import ciphers
 from cryptography.hazmat.primitives.ciphers import algorithms
 from cryptography.hazmat.primitives.ciphers import modes
-import gmpy2 as gmpy
+import gmpy
 
 GCD_30_DELTA = [6, 4, 2, 4, 2, 4, 6, 2]
 

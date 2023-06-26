@@ -86,8 +86,8 @@ the nature of the error.
 
 ## Methods to detect weak pseudorandom numbers in ECDSA signatures.
 
-A powerful and flexible approach to detect ECDSA signatures with weak k's is
-to use lattice basis reduction [[HowSma]], [[Nguyen]], [[BreHen]], etc. Several
+A powerful and flexible approach to detect ECDSA signatures with weak k's is to
+use lattice basis reduction [[HowSma]], [[Nguyen]], [[BreHen]], etc. Several
 checks implemented in paranoid are based on this approach. The first step is to
 define some variant of a hidden number problem. From a set of ECDSA signatures
 $(r_i, s_i)$ for messages $m_i$ one computes pairs $(a_i, b_i)$ with the
@@ -134,8 +134,8 @@ linear combinations of a small set of generators with small coefficients.
 
 A simple example is the Cr50 weakness. Here the values $k$ have the format
 `aaaabbbbccccddddeeeeffffgggghhhh`, where a,b,c,d,e,f,g,h are random bytes.
-Hence the k's are linear combinations of the set
-$\{1010101_{16} \cdot 2^{32 j}: 0 \leq j \leq 7\}$.
+Hence the k's are linear combinations of the set $\{1010101_{16} \cdot 2^{32
+j}: 0 \leq j \leq 7\}$.
 
 ### Precomputation
 

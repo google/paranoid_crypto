@@ -14,7 +14,7 @@
 """Set of useful linear algebra functions."""
 
 from typing import Optional
-import gmpy2 as gmpy
+import gmpy
 
 
 def echelon_form(a: list[list[int]], b: Optional[list[int]] = None) -> int:

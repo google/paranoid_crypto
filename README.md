@@ -75,21 +75,12 @@ Clone the repository:
 
 ```$ git clone https://github.com/google/paranoid_crypto.git && cd paranoid_crypto```
 
-**NOTE**: The commands below have been tested on Debian stable version
-(bookworm). Make sure you will be using `python3.11` or newer.
+**NOTE**: The commands below have been tested on Debian latest stable version
+(bullseye). Make sure you will be using `python3.9` or newer.
 
 Install dependencies:
 
-```$ sudo apt update && sudo apt install python3 python3-full python3-pip python3-pybind11 python3-fpylll python3-gmpy2 protobuf-compiler```
-
-Create and activate a virtual environment:
-
-```$ python3 -m venv --system-site-packages ~/paranoid-venv```
-
-```$ source ~/paranoid-venv/bin/activate```
-
-**NOTE**: If you know what you are doing, you can instead skip to the next step
-and use `--break-system-packages` switch for `pip`.
+```$ sudo apt update && sudo apt install python3 python3-pip python3-pybind11 python3-fpylll libgmp-dev protobuf-compiler```
 
 Install paranoid_crypto python package:
 

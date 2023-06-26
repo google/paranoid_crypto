@@ -29,7 +29,7 @@ from collections.abc import Iterator
 import enum
 from typing import Optional
 
-import gmpy2 as gmpy
+import gmpy
 
 from paranoid_crypto import paranoid_pb2
 from paranoid_crypto.lib import ec_util

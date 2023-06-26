@@ -16,7 +16,7 @@
 import random
 from absl.testing import absltest
 from absl.testing import parameterized
-import gmpy2 as gmpy
+import gmpy
 from paranoid_crypto import paranoid_pb2
 from paranoid_crypto.lib import ec_util
 from paranoid_crypto.lib import util

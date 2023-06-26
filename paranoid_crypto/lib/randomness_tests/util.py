@@ -16,7 +16,7 @@
 import array
 from collections.abc import Iterator
 import math
-import gmpy2 as gmpy
+import gmpy
 import numpy
 from scipy import fftpack as scipy_fft
 from scipy import special as scipy_special
