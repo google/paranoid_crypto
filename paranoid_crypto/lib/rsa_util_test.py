@@ -15,7 +15,7 @@
 
 import random
 from absl.testing import absltest
-import gmpy
+import gmpy2 as gmpy
 from paranoid_crypto.lib import rsa_util
 
 
