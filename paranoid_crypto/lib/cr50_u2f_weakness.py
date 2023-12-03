@@ -15,7 +15,7 @@
 
 from collections.abc import Iterator
 
-import gmpy
+import gmpy2 as gmpy
 
 from paranoid_crypto.lib import lll
 

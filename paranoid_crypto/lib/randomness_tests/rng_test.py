@@ -38,24 +38,21 @@ class RngTest(absltest.TestCase):
     self.assertEqual(0xcb47d804530bce3d9460,
                      rng.Mt19937().RandomBits(80, seed=123456))
 
-  def testGmp(self):
-    """Regression test.
+  def testTruncLcg(self):
+    """Regression test."""
 
-    The sole purpose of this test is to detect changes in gmpy.rand, so that
-    other unit tests based on the weaknesses of gmpy.rand can be adjusted.
-    """
-    self.assertEqual(0x43eca180f7892ceb,
-                     rng.GmpRand(16).RandomBits(63, seed=123456))
-    self.assertEqual(0x7bd2b404e4b92216,
-                     rng.GmpRand(20).RandomBits(63, seed=123456))
-    self.assertEqual(0x1759df573d27d9be,
-                     rng.GmpRand(28).RandomBits(63, seed=123456))
-    self.assertEqual(0x2af9a4aca4686baf,
-                     rng.GmpRand(32).RandomBits(63, seed=123456))
-    self.assertEqual(0x2cf869f9ae314763,
-                     rng.GmpRand(64).RandomBits(63, seed=123456))
-    self.assertEqual(0x66af6d53fe71fa68,
-                     rng.GmpRand(128).RandomBits(63, seed=123456))
+    self.assertEqual(0x61bd2b29909c8e52,
+                     rng.TruncLcgRand(16).RandomBits(63, seed=123456))
+    self.assertEqual(0xa3a607d44d04a862,
+                     rng.TruncLcgRand(20).RandomBits(63, seed=123456))
+    self.assertEqual(0xa5ec19808421926,
+                     rng.TruncLcgRand(28).RandomBits(63, seed=123456))
+    self.assertEqual(0xcb8975dc5d19c51c,
+                     rng.TruncLcgRand(32).RandomBits(63, seed=123456))
+    self.assertEqual(0x567ee71b6de6b032,
+                     rng.TruncLcgRand(64).RandomBits(63, seed=123456))
+    self.assertEqual(0xcc314cf91cc12913,
+                     rng.TruncLcgRand(128).RandomBits(63, seed=123456))
 
   def testJavaRandom(self):
     """Compares the implementation with output from java.util.random."""
