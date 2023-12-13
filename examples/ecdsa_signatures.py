@@ -127,7 +127,37 @@ ecdsa_sig4.issuer_key_info.y = util.Int2Bytes(
     38928227198180667951060174873757842094604530644576397676642423924927058396944
 )
 
-ecdsa_signatures = [ecdsa_sig1, ecdsa_sig2, ecdsa_sig3, ecdsa_sig4]
+ecdsa_sig5 = paranoid_pb2.ECDSASignature()
+ecdsa_sig5.ecdsa_sig_info.algorithm = paranoid_pb2.SignatureAlgorithm.ECDSA_WITH_SHA512
+ecdsa_sig5.ecdsa_sig_info.r = util.Hex2Bytes(
+    'a579c98160c2e4066f8defcc2a8510f027531287ee4b593fd9a2b17f6a9d86d9')
+ecdsa_sig5.ecdsa_sig_info.s = util.Hex2Bytes(
+    '6082cf8f763ab383ca1be56dd04aa64bb0b0f862dba922821e902dd0da6c6bb0')
+ecdsa_sig5.ecdsa_sig_info.message_hash = util.Hex2Bytes(
+    '25ffca8499df94d5725334521f18302f4aace2acf31f50659400cfb7d59e21338974f16127330ae6d371850cfa88c967000e373370068757409050405c5fe31e'
+)
+ecdsa_sig5.issuer_key_info.curve_type = paranoid_pb2.CurveType.CURVE_SECP256R1
+ecdsa_sig5.issuer_key_info.x = util.Hex2Bytes(
+    '7139faa536fc4b313b77fa7c2c8dd737a7a66bac756593867f797d6fb3bec5a5')
+ecdsa_sig5.issuer_key_info.y = util.Hex2Bytes(
+    '1a75275829d4ca8353f3706cc584f019da41ec3eb093c0996990a6e0929be9fd')
+
+ecdsa_sig6 = paranoid_pb2.ECDSASignature()
+ecdsa_sig6.ecdsa_sig_info.algorithm = paranoid_pb2.SignatureAlgorithm.ECDSA_WITH_SHA256
+ecdsa_sig6.ecdsa_sig_info.r = util.Hex2Bytes(
+    '5ca7141be13da0837eb8cd51ca37da75d16fed96baaa85cc9b13e76e0c509a84')
+ecdsa_sig6.ecdsa_sig_info.s = util.Hex2Bytes(
+    'dd3b20d56a95b4261c334e0f114031e7a2a8e561f666e478398000e3347994b7')
+ecdsa_sig6.ecdsa_sig_info.message_hash = util.Hex2Bytes(
+    '532eaabd9574880dbf76b9b8cc00832c20a6ec113d682299550d7a6e0f345e25')
+ecdsa_sig6.issuer_key_info.curve_type = paranoid_pb2.CurveType.CURVE_SECP256R1
+ecdsa_sig6.issuer_key_info.x = util.Hex2Bytes(
+    '6c45b2166cd815d15c59183e25f35a040ae2e5552ac73f04f7cabcbad416ed18')
+ecdsa_sig6.issuer_key_info.y = util.Hex2Bytes(
+    'e926a54e84941b840e27a43c4f3eb9d420bc514f13be9891ea0b4703e1d32c7f')
+
+
+ecdsa_signatures = [ecdsa_sig1, ecdsa_sig2, ecdsa_sig3, ecdsa_sig5, ecdsa_sig6]
 
 # Sample output
 # ------------------------
@@ -158,6 +188,17 @@ ecdsa_signatures = [ecdsa_sig1, ecdsa_sig2, ecdsa_sig3, ecdsa_sig4]
 # Found second signature to be potentially weak? True
 # Second signature is weak to CheckLCGNonceJavaUtilRandom? True
 
+def SignatureResults(ecdsa_test_info):
+    tests = ["CheckLCGNonceGMP", "CheckLCGNonceJavaUtilRandom", "CheckNonceMSB","CheckNonceCommonPrefix", "CheckNonceCommonPostfix", "CheckNonceGeneralized", "CheckIssuerKey", "CheckCr50U2f"]
+    weakTo = ""
+    res = False
+    for test in tests:
+        test_res = util.GetTestResult(ecdsa_test_info, test)
+        res_tmp = test_res and test_res.result
+        if res_tmp:
+            weakTo += test + " "
+            res = True
+    return res, weakTo
 
 def main(argv: list[str]) -> None:
   """Examples of testing ECDSA signatures.
@@ -180,15 +221,16 @@ def main(argv: list[str]) -> None:
     else:
       paranoid.CheckAllECDSASigs(ecdsa_signatures, log_level=1)
 
-  logging.info("Found first signature to be potentially weak? %s",
-               ecdsa_sig1.test_info.weak)
-  logging.info("Found second signature to be potentially weak? %s",
-               ecdsa_sig2.test_info.weak)
-  test_res = util.GetTestResult(ecdsa_sig2.test_info,
-                                "CheckLCGNonceJavaUtilRandom")
-  res = test_res and test_res.result
-  logging.info("Second signature is weak to CheckLCGNonceJavaUtilRandom? %s",
-               res)  # Same for ecdsa_sig3 and ecdsa_sig4...
+  i = 0
+  print("\n-------- Testing %s ECDSA signatures --------" % len(ecdsa_signatures))
+  for sig in ecdsa_signatures:
+    res, checks = SignatureResults(sig.test_info)
+    if res:
+        logging.info("Signature ecdsa_signatures[%s] is weak to %s", i, checks)
+    else:
+        logging.info("Signature ecdsa_signatures[%s] isn't weak to any checks", i)
+    i+=1
+
 
 
 if __name__ == "__main__":
