@@ -75,7 +75,7 @@ Clone the repository:
 
 ```$ git clone https://github.com/google/paranoid_crypto.git && cd paranoid_crypto```
 
-**NOTE**: The commands below have been tested on Debian latest stable version
+**NOTE**: The commands below have been tested on Debian oldstable version
 (bullseye). Make sure you will be using `python3.9` or newer.
 
 Install dependencies:
