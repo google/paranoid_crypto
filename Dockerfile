@@ -1,5 +1,5 @@
-# Install latest debian image
-FROM debian:latest
+# Install bullseye debian image
+FROM debian:bullseye
 
 # Create user
 RUN useradd -ms /bin/bash paranoid-user
