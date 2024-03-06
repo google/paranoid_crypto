@@ -24,7 +24,7 @@ import os
 import random
 from typing import Optional
 
-import gmpy
+import gmpy2 as gmpy
 from numpy import random as numpy_random
 
 
@@ -152,9 +152,8 @@ class GmpRand(Rng):
     """See base class."""
     if seed is None:
       seed = int.from_bytes(os.urandom(16), "little")
-    gmpy.rand("init", self.output_size)
-    gmpy.rand("seed", seed)
-    return int(gmpy.rand("next", 1 << n))
+    rand_state = gmpy.random_state(seed)
+    return int(gmpy.mpz_random(rand_state, 1 << n))
 
 
 class XorShift128plus(Rng):

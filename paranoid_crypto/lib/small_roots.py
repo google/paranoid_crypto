@@ -15,7 +15,7 @@
 
 import itertools
 from typing import Optional
-import gmpy
+import gmpy2 as gmpy
 from paranoid_crypto.lib import linalg_util
 from paranoid_crypto.lib import lll
 import sympy

@@ -44,7 +44,7 @@ For example the paper above describes the use of a sloppy reduction.
 
 import math
 from typing import Optional, Union
-import gmpy
+import gmpy2 as gmpy
 from paranoid_crypto import paranoid_pb2
 from paranoid_crypto.lib import util
 

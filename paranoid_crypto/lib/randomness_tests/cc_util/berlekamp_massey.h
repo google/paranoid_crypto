@@ -16,6 +16,7 @@
 #define PARANOID_CRYPTO_LIB_RANDOMNESS_TESTS_CC_UTIL_BERLEKAMP_MASSEY_H_
 #include <string>
 #include <vector>
+#include <cstdint>
 
 namespace paranoid_crypto::lib::randomness_tests::cc_util {
 

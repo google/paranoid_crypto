@@ -15,7 +15,7 @@
 import os
 from absl.testing import absltest
 from absl.testing import parameterized
-import gmpy
+import gmpy2 as gmpy
 from paranoid_crypto.lib.randomness_tests import lattice_suite
 
 
@@ -47,9 +47,9 @@ class LatticeSuiteTest(parameterized.TestCase):
     test_size = 100
     sample = []
     for _ in range(test_size):
-      gmpy.rand("init", output_size)
-      gmpy.rand("seed", int.from_bytes(os.urandom(16), "little"))
-      block = int(gmpy.rand("next", 1 << block_size))
+      # TODO: the default RNG has changed from LCG (that these tests assume) to MT, so tests will fail.
+      rand_state = gmpy.random_state(int.from_bytes(os.urandom(16), "little"))
+      block = int(gmpy.mpz_random(rand_state, 1 << block_size))
       sample.append(block)
     p_value = lattice_suite.FindBiasImpl(sample, 2**block_size)
     self.assertAlmostEqual(0.0, p_value)
@@ -61,9 +61,9 @@ class LatticeSuiteTest(parameterized.TestCase):
     # the bit string into blocks gives blocks that are equally aligned.
     block_size = 3 * output_size
     test_size = 100 * block_size
-    gmpy.rand("init", output_size)
-    gmpy.rand("seed", int.from_bytes(os.urandom(16), "little"))
-    bits = int(gmpy.rand("next", 1 << test_size))
+    # TODO: the default RNG has changed from LCG (that these tests assume) to MT, so tests will fail.
+    rand_state = gmpy.random_state(int.from_bytes(os.urandom(16), "little"))
+    bits = int(gmpy.mpz_random(rand_state, 1 << block_size))
     # NOTE(bleichen): The test here generates a long bit string of consecutive
     #   outputs from GMPs random number generator. The constants found by
     #   FindBias are aligned for this bit string. Using these constants it is
