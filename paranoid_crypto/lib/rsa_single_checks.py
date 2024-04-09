@@ -17,7 +17,7 @@ import hashlib
 import math
 from typing import Optional
 from absl import logging
-import gmpy
+import gmpy2 as gmpy
 from paranoid_crypto import paranoid_pb2
 from paranoid_crypto.lib import base_check
 from paranoid_crypto.lib import consts

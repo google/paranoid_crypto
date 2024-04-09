@@ -18,7 +18,7 @@ if partial information about the prime numbers is known.
 """
 
 from typing import Optional
-import gmpy
+import gmpy2 as gmpy
 from paranoid_crypto.lib import ntheory_util
 
 
@@ -84,11 +84,11 @@ def FactorWithGuess(n: int, p_0: int) -> Optional[list[int]]:
     # odd.
     if abs(u * q_0 - v * p_0) < bound:
       d = 4 * u * v * n
-      a = gmpy.sqrt(d)
+      a = gmpy.isqrt(d)
       if a * a < d:
         a += 1
       if gmpy.is_square(a * a - d):
-        b = gmpy.sqrt(a * a - d)
+        b = gmpy.isqrt(a * a - d)
         g = gmpy.gcd(a + b, n)
         if 1 < g < n:
           return [g, n // g]
