@@ -29,8 +29,7 @@ from collections.abc import Iterator
 import enum
 from typing import Optional
 
-import gmpy
-
+import gmpy2 as gmpy
 from paranoid_crypto import paranoid_pb2
 from paranoid_crypto.lib import ec_util
 from paranoid_crypto.lib import lcg_constants
@@ -39,6 +38,7 @@ from paranoid_crypto.lib import lll
 
 class Bias(enum.Enum):
   """Describes the bias of the values k[i] = a[i] + b[i] * x % n."""
+
   MSB = 1  # The most significant bits of k[i] are 0.
   COMMON_PREFIX = 2  # The most significant bits of k[i] are the same.
   COMMON_POSTFIX = 3  # The least significant bits of k[i] are the same
@@ -88,8 +88,9 @@ class SearchStrategy(enum.Flag):
   DEFAULT = SINGLE | SLIDING | INCLUDE_KEY
 
 
-def GetLattice(a: list[int], b: list[int], w: Optional[int], n: int,
-               bias: Bias):
+def GetLattice(
+    a: list[int], b: list[int], w: Optional[int], n: int, bias: Bias
+):
   """Returns a lattice for a hidden number problem.
 
   Generally the goal is to find a hidden integer x such that the elements of
@@ -210,8 +211,9 @@ def GetLattice(a: list[int], b: list[int], w: Optional[int], n: int,
   return lat
 
 
-def HiddenNumberProblem(a: list[int], b: list[int], w: Optional[int], n: int,
-                        bias: Bias):
+def HiddenNumberProblem(
+    a: list[int], b: list[int], w: Optional[int], n: int, bias: Bias
+):
   """Solves a hidden number problem.
 
   Tries to find an integer x, such that
@@ -240,9 +242,9 @@ def HiddenNumberProblem(a: list[int], b: list[int], w: Optional[int], n: int,
   return list(guesses)
 
 
-def HiddenNumberProblemWithPrecomputation(a: list[int], b: list[int], n: int,
-                                          constants: list[tuple[int, int]],
-                                          w: int) -> list[int]:
+def HiddenNumberProblemWithPrecomputation(
+    a: list[int], b: list[int], n: int, constants: list[tuple[int, int]], w: int
+) -> list[int]:
   """Tries to solve a hidden number problem with precomputed constants.
 
   This function tries to find an integer x, such that all values
@@ -303,8 +305,11 @@ def HiddenNumberProblemWithPrecomputation(a: list[int], b: list[int], n: int,
 
 
 def _HiddenNumberProblemSubsets(
-    a: list[int], b: list[int], curve_type: paranoid_pb2.CurveType,
-    lcg: Optional[lcg_constants.LcgName], flags: SearchStrategy
+    a: list[int],
+    b: list[int],
+    curve_type: paranoid_pb2.CurveType,
+    lcg: Optional[lcg_constants.LcgName],
+    flags: SearchStrategy,
 ) -> Iterator[tuple[list[int], list[int], list[tuple[int, int]], int]]:
   """Yields subsets for the hidden number problem.
 
@@ -343,8 +348,8 @@ def _HiddenNumberProblemSubsets(
       if flags & SearchStrategy.SLIDING:
         num_constants = (sample_size - 1) // sliding_window_size + 1
         for i in range(len(a) - sliding_window_size + 1):
-          a0 = a[i:i + sliding_window_size]
-          b0 = b[i:i + sliding_window_size]
+          a0 = a[i : i + sliding_window_size]
+          b0 = b[i : i + sliding_window_size]
           yield a0, b0, constant_list[:num_constants], w
           tests_done += 1
 
@@ -369,10 +374,13 @@ def _HiddenNumberProblemSubsets(
       continue
 
 
-def HiddenNumberProblemForCurve(a: list[int], b: list[int],
-                                curve_type: paranoid_pb2.CurveType,
-                                lcg: Optional[lcg_constants.LcgName],
-                                flags: SearchStrategy) -> list[int]:
+def HiddenNumberProblemForCurve(
+    a: list[int],
+    b: list[int],
+    curve_type: paranoid_pb2.CurveType,
+    lcg: Optional[lcg_constants.LcgName],
+    flags: SearchStrategy,
+) -> list[int]:
   """Attempts to detect ECDSA signatures for a given curve.
 
   This function tries to find the private key used to generate
@@ -396,6 +404,7 @@ def HiddenNumberProblemForCurve(a: list[int], b: list[int],
   n = curve.n
   guesses = []
   for a0, b0, constants, w in _HiddenNumberProblemSubsets(
-      a, b, curve_type, lcg, flags):
+      a, b, curve_type, lcg, flags
+  ):
     guesses += HiddenNumberProblemWithPrecomputation(a0, b0, n, constants, w)
   return guesses

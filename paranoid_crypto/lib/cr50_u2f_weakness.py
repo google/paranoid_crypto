@@ -15,13 +15,13 @@
 
 from collections.abc import Iterator
 
-import gmpy
-
+import gmpy2 as gmpy
 from paranoid_crypto.lib import lll
 
 
-def Cr50U2fSubProblem(a: int, b: int, w: int, p: int,
-                      basis: list[int]) -> Iterator[tuple[int, int]]:
+def Cr50U2fSubProblem(
+    a: int, b: int, w: int, p: int, basis: list[int]
+) -> Iterator[tuple[int, int]]:
   """Generalized subproblem for the U2F weakness.
 
   This function tries to find k1, k2 of the form
@@ -56,13 +56,14 @@ def Cr50U2fSubProblem(a: int, b: int, w: int, p: int,
   reduced = lll.reduce(lat)
   for row in reduced:
     k1 = abs(sum(v * w for v, w in zip(basis, row[:words])))
-    k2 = abs(sum(v * w for v, w in zip(basis, row[words:2 * words])))
+    k2 = abs(sum(v * w for v, w in zip(basis, row[words : 2 * words])))
     if (k1 * a + k2 * b - w) % p == 0:
       yield k1, k2
 
 
-def Cr50U2fGuesses(r1: int, s1: int, z1: int, r2: int, s2: int, z2: int,
-                   n: int) -> set[int]:
+def Cr50U2fGuesses(
+    r1: int, s1: int, z1: int, r2: int, s2: int, z2: int, n: int
+) -> set[int]:
   """Checks, whether two signatures use weak nonces like in the U2F flaw.
 
   This function tries to find x, k1, k2 such that:

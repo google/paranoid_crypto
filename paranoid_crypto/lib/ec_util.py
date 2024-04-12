@@ -44,7 +44,7 @@ For example the paper above describes the use of a sloppy reduction.
 
 import math
 from typing import Optional, Union
-import gmpy
+import gmpy2 as gmpy
 from paranoid_crypto import paranoid_pb2
 from paranoid_crypto.lib import util
 
@@ -66,15 +66,17 @@ EcPointJacobian = tuple[int, int, int]
 class EcCurve:
   """An elliptic curve over a prime field in Weierstrass form."""
 
-  def __init__(self,
-               name: str,
-               a: int,
-               b: int,
-               mod: int,
-               gx: int,
-               gy: int,
-               n: int,
-               h: int = 1):
+  def __init__(
+      self,
+      name: str,
+      a: int,
+      b: int,
+      mod: int,
+      gx: int,
+      gy: int,
+      n: int,
+      h: int = 1,
+  ):
     """Defines the curve y^2 = x^3 + a * x + b over a prime field.
 
     Args:
@@ -246,8 +248,9 @@ class EcCurve:
     z2 = 2 * y * z % mod
     return x2, y2, z2
 
-  def AddJacobian(self, p: EcPointJacobian,
-                  q: EcPointJacobian) -> EcPointJacobian:
+  def AddJacobian(
+      self, p: EcPointJacobian, q: EcPointJacobian
+  ) -> EcPointJacobian:
     """Adds two points in Jacobian representation.
 
     Args:
@@ -400,8 +403,9 @@ class EcCurve:
         res[i] = p[0] * wsqr % mod
     return res
 
-  def BatchJacobianToAffine(self,
-                            p_list: list[EcPointJacobian]) -> list[EcPoint]:
+  def BatchJacobianToAffine(
+      self, p_list: list[EcPointJacobian]
+  ) -> list[EcPoint]:
     """Converts a list of points from Jacobian to affine representation.
 
     Args:
@@ -458,8 +462,9 @@ class EcCurve:
       raise ArithmeticError("failed invariant")
     return res
 
-  def BatchAddList(self, p_list: list[EcPoint],
-                   q_list: list[EcPoint]) -> list[EcPoint]:
+  def BatchAddList(
+      self, p_list: list[EcPoint], q_list: list[EcPoint]
+  ) -> list[EcPoint]:
     """Computes the sum of two lists of points.
 
     Args:
@@ -579,8 +584,8 @@ class EcCurve:
     return tmp
 
   def BatchAddSubtractX(
-      self, p: EcPoint,
-      points: list[EcPoint]) -> tuple[list[Coordinate], list[Coordinate]]:
+      self, p: EcPoint, points: list[EcPoint]
+  ) -> tuple[list[Coordinate], list[Coordinate]]:
     """Does a batch computation.
 
        Computes the X-coordinate of the addition and subtraction of a point
@@ -794,7 +799,7 @@ class EcCurve:
     # Repetition of 32 bit words.
     quad_words = self.n.bit_length() // 32
     for j in range(2, quad_words + 1):
-      multipliers.append(sum(2**(32 * i) for i in range(j)))
+      multipliers.append(sum(2 ** (32 * i) for i in range(j)))
     inverses = [gmpy.invert(m, self.n) for m in multipliers]
     all_points = [None] * (len(multipliers) * num_points)
     for j, inverse in enumerate(inverses):
@@ -807,10 +812,12 @@ class EcCurve:
         res[k % num_points] = int(dlog * multipliers[k // num_points])
     return res
 
-  def BatchDLOfDifferences(self,
-                           points: list[EcPoint],
-                           other_points: Optional[list[EcPoint]] = None,
-                           max_diff: int = 2**24) -> list[Optional[str]]:
+  def BatchDLOfDifferences(
+      self,
+      points: list[EcPoint],
+      other_points: Optional[list[EcPoint]] = None,
+      max_diff: int = 2**24,
+  ) -> list[Optional[str]]:
     """Finds small DLs of differences between points.
 
     This functions finds pairs of weak keys with points p and q
@@ -911,8 +918,9 @@ def PublicPoint(key: paranoid_pb2.ECKeyInfo) -> tuple[int, int]:
   return (x, y)
 
 
-def ECDSAValues(sig: paranoid_pb2.ECDSASignatureInfo,
-                curve: EcCurve) -> tuple[int, int, int]:
+def ECDSAValues(
+    sig: paranoid_pb2.ECDSASignatureInfo, curve: EcCurve
+) -> tuple[int, int, int]:
   """Returns a triple (r, s, z) containing values of the ecdsa signature.
 
   Args:
@@ -931,201 +939,240 @@ def ECDSAValues(sig: paranoid_pb2.ECDSASignatureInfo,
 
 
 CURVE_FACTORY = {
-    paranoid_pb2.CurveType.CURVE_SECP256R1:
-        EcCurve(
-            name="secp256r1",
-            mod=2**256 - 2**224 + 2**192 + 2**96 - 1,
-            a=-3,
-            b=int(
-                "5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2"
-                "604b", 16),
-            gx=int(
-                "6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898"
-                "c296", 16),
-            gy=int(
-                "4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf"
-                "51f5", 16),
-            n=int("115792089210356248762697446949407573529996955224135760342422"
-                  "259061068512044369"),
+    paranoid_pb2.CurveType.CURVE_SECP256R1: EcCurve(
+        name="secp256r1",
+        mod=2**256 - 2**224 + 2**192 + 2**96 - 1,
+        a=-3,
+        b=int(
+            "5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b",
+            16,
         ),
-    paranoid_pb2.CurveType.CURVE_SECP384R1:
-        EcCurve(
-            name="secp384r1",
-            mod=int(
-                "394020061963944792122790401001436138050797392704654466679482"
-                "93404245721771496870329047266088258938001861606973112319"),
-            a=-3,
-            b=int(
-                "b3312fa7e23ee7e4988e056be3f82d19181d9c6efe8141120314088f5013"
-                "875ac656398d8a2ed19d2a85c8edd3ec2aef", 16),
-            gx=int(
-                "aa87ca22be8b05378eb1c71ef320ad746e1d3b628ba79b9859f741e08254"
-                "2a385502f25dbf55296c3a545e3872760ab7", 16),
-            gy=int(
-                "3617de4a96262c6f5d9e98bf9292dc29f8f41dbd289a147ce9da3113b5f0"
-                "b8c00a60b1ce1d7e819d7a431d7c90ea0e5f", 16),
-            n=int("394020061963944792122790401001436138050797392704654466679469"
-                  "05279627659399113263569398956308152294913554433653942643"),
+        gx=int(
+            "6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296",
+            16,
         ),
-    paranoid_pb2.CurveType.CURVE_SECP192R1:
-        EcCurve(
-            name="secp192r1",
-            mod=2**192 - 2**64 - 1,
-            n=int("FFFFFFFFFFFFFFFFFFFFFFFF99DEF836146BC9B1B4D22831", 16),
-            a=-3,
-            b=int("64210519E59C80E70FA7E9AB72243049FEB8DEECC146B9B1", 16),
-            gx=int("188DA80EB03090F67CBF20EB43A18800F4FF0AFD82FF1012", 16),
-            gy=int("7192B95FFC8DA78631011ED6B24CDD573F977A11E794811", 16),
+        gy=int(
+            "4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5",
+            16,
         ),
-    paranoid_pb2.CurveType.CURVE_SECP224R1:
-        EcCurve(
-            name="secp224r1",
-            mod=2**224 - 2**96 + 1,
-            n=int("269599466671506397946670150870196259404578077144243917216827"
-                  "22368061"),
-            a=-3,
-            b=int("b4050a850c04b3abf54132565044b0b7d7bfd8ba270b39432355ffb4",
-                  16),
-            gx=int("b70e0cbd6bb4bf7f321390b94a03c1d356c21122343280d6115c1d21",
-                   16),
-            gy=int("bd376388b5f723fb4c22dfe6cd4375a05a07476444d5819985007e34",
-                   16),
+        n=int(
+            "115792089210356248762697446949407573529996955224135760342422"
+            "259061068512044369"
         ),
-    paranoid_pb2.CurveType.CURVE_SECP521R1:
-        EcCurve(
-            name="secp521r1",
-            mod=int(
-                "686479766013060971498190079908139321726943530014330540939446"
-                "345918554318339765605212255964066145455497729631139148085803"
-                "7121987999716643812574028291115057151"),
-            n=int("686479766013060971498190079908139321726943530014330540939446"
-                  "345918554318339765539424505774633321719753296399637136332111"
-                  "3864768612440380340372808892707005449"),
-            a=-3,
-            b=int(
-                "51953eb9618e1c9a1f929a21a0b68540eea2da725b99b315f3b8b489918e"
-                "f109e156193951ec7e937b1652c0bd3bb1bf073573df883d2c34f1ef451f"
-                "d46b503f00", 16),
-            gx=int(
-                "c6858e06b70404e9cd9e3ecb662395b4429c648139053fb521f828af606b"
-                "4d3dbaa14b5e77efe75928fe1dc127a2ffa8de3348b3c1856a429bf97e7e"
-                "31c2e5bd66", 16),
-            gy=int(
-                "11839296a789a3bc0045c8a5fb42c7d1bd998f54449579b446817afbd172"
-                "73e662c97ee72995ef42640c550b9013fad0761353c7086a272c24088be9"
-                "4769fd16650", 16),
+    ),
+    paranoid_pb2.CurveType.CURVE_SECP384R1: EcCurve(
+        name="secp384r1",
+        mod=int(
+            "394020061963944792122790401001436138050797392704654466679482"
+            "93404245721771496870329047266088258938001861606973112319"
         ),
-    paranoid_pb2.CurveType.CURVE_SECP256K1:
-        EcCurve(
-            name="secp256k1",
-            mod=2**256 - 2**32 - 977,
-            a=0,
-            b=7,
-            gx=int(
-                "79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F8"
-                "1798", 16),
-            gy=int(
-                "483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10"
-                "D4B8", 16),
-            n=int(
-                "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD036"
-                "4141", 16),
-            h=1),
-    paranoid_pb2.CurveType.CURVE_BRAINPOOLP256R1:
-        EcCurve(
-            name="brainpoolP256r1",
-            mod=int(
-                "A9FB57DBA1EEA9BC3E660A909D838D726E3BF623D52620282013481D1F6E"
-                "5377", 16),
-            a=int(
-                "7D5A0975FC2C3057EEF67530417AFFE7FB8055C126DC5C6CE94A4B44F330"
-                "B5D9", 16),
-            b=int(
-                "26DC5C6CE94A4B44F330B5D9BBD77CBF958416295CF7E1CE6BCCDC18FF8C"
-                "07B6", 16),
-            gx=int(
-                "8BD2AEB9CB7E57CB2C4B482FFC81B7AFB9DE27E1E3BD23C23A4453BD9ACE"
-                "3262", 16),
-            gy=int(
-                "547EF835C3DAC4FD97F8461A14611DC9C27745132DED8E545C1D54C72F04"
-                "6997", 16),
-            n=int(
-                "A9FB57DBA1EEA9BC3E660A909D838D718C397AA3B561A6F7901E0E829748"
-                "56A7", 16),
+        a=-3,
+        b=int(
+            "b3312fa7e23ee7e4988e056be3f82d19181d9c6efe8141120314088f5013"
+            "875ac656398d8a2ed19d2a85c8edd3ec2aef",
+            16,
         ),
-    paranoid_pb2.CurveType.CURVE_BRAINPOOLP384R1:
-        EcCurve(
-            name="brainpoolP384r1",
-            mod=int(
-                "8CB91E82A3386D280F5D6F7E50E641DF152F7109ED5456B412B1DA197FB7"
-                "1123ACD3A729901D1A71874700133107EC53", 16),
-            a=int(
-                "7BC382C63D8C150C3C72080ACE05AFA0C2BEA28E4FB22787139165EFBA91"
-                "F90F8AA5814A503AD4EB04A8C7DD22CE2826", 16),
-            b=int(
-                "04A8C7DD22CE28268B39B55416F0447C2FB77DE107DCD2A62E880EA53EEB"
-                "62D57CB4390295DBC9943AB78696FA504C11", 16),
-            gx=int(
-                "1D1C64F068CF45FFA2A63A81B7C13F6B8847A3E77EF14FE3DB7FCAFE0CBD"
-                "10E8E826E03436D646AAEF87B2E247D4AF1E", 16),
-            gy=int(
-                "8ABE1D7520F9C2A45CB1EB8E95CFD55262B70B29FEEC5864E19C054FF991"
-                "29280E4646217791811142820341263C5315", 16),
-            n=int(
-                "8CB91E82A3386D280F5D6F7E50E641DF152F7109ED5456B31F166E6CAC04"
-                "25A7CF3AB6AF6B7FC3103B883202E9046565", 16),
-            h=1),
-    paranoid_pb2.CurveType.CURVE_BRAINPOOLP512R1:
-        EcCurve(
-            name="brainpoolP512r1",
-            mod=int(
-                "AADD9DB8DBE9C48B3FD4E6AE33C9FC07CB308DB3B3C9D20ED6639CCA7033"
-                "08717D4D9B009BC66842AECDA12AE6A380E62881FF2F2D82C68528AA6056"
-                "583A48F3", 16),
-            a=int(
-                "7830A3318B603B89E2327145AC234CC594CBDD8D3DF91610A83441CAEA98"
-                "63BC2DED5D5AA8253AA10A2EF1C98B9AC8B57F1117A72BF2C7B9E7C1AC4D"
-                "77FC94CA", 16),
-            b=int(
-                "3DF91610A83441CAEA9863BC2DED5D5AA8253AA10A2EF1C98B9AC8B57F11"
-                "17A72BF2C7B9E7C1AC4D77FC94CADC083E67984050B75EBAE5DD2809BD63"
-                "8016F723", 16),
-            gx=int(
-                "81AEE4BDD82ED9645A21322E9C4C6A9385ED9F70B5D916C1B43B62EEF4D0"
-                "098EFF3B1F78E2D0D48D50D1687B93B97D5F7C6D5047406A5E688B352209"
-                "BCB9F822", 16),
-            gy=int(
-                "7DDE385D566332ECC0EABFA9CF7822FDF209F70024A57B1AA000C55B881F"
-                "8111B2DCDE494A5F485E5BCA4BD88A2763AED1CA2B2FA8F0540678CD1E0F"
-                "3AD80892", 16),
-            n=int(
-                "AADD9DB8DBE9C48B3FD4E6AE33C9FC07CB308DB3B3C9D20ED6639CCA7033"
-                "0870553E5C414CA92619418661197FAC10471DB1D381085DDADDB5879682"
-                "9CA90069", 16),
-            h=1),
+        gx=int(
+            "aa87ca22be8b05378eb1c71ef320ad746e1d3b628ba79b9859f741e08254"
+            "2a385502f25dbf55296c3a545e3872760ab7",
+            16,
+        ),
+        gy=int(
+            "3617de4a96262c6f5d9e98bf9292dc29f8f41dbd289a147ce9da3113b5f0"
+            "b8c00a60b1ce1d7e819d7a431d7c90ea0e5f",
+            16,
+        ),
+        n=int(
+            "394020061963944792122790401001436138050797392704654466679469"
+            "05279627659399113263569398956308152294913554433653942643"
+        ),
+    ),
+    paranoid_pb2.CurveType.CURVE_SECP192R1: EcCurve(
+        name="secp192r1",
+        mod=2**192 - 2**64 - 1,
+        n=int("FFFFFFFFFFFFFFFFFFFFFFFF99DEF836146BC9B1B4D22831", 16),
+        a=-3,
+        b=int("64210519E59C80E70FA7E9AB72243049FEB8DEECC146B9B1", 16),
+        gx=int("188DA80EB03090F67CBF20EB43A18800F4FF0AFD82FF1012", 16),
+        gy=int("7192B95FFC8DA78631011ED6B24CDD573F977A11E794811", 16),
+    ),
+    paranoid_pb2.CurveType.CURVE_SECP224R1: EcCurve(
+        name="secp224r1",
+        mod=2**224 - 2**96 + 1,
+        n=int(
+            "269599466671506397946670150870196259404578077144243917216827"
+            "22368061"
+        ),
+        a=-3,
+        b=int("b4050a850c04b3abf54132565044b0b7d7bfd8ba270b39432355ffb4", 16),
+        gx=int("b70e0cbd6bb4bf7f321390b94a03c1d356c21122343280d6115c1d21", 16),
+        gy=int("bd376388b5f723fb4c22dfe6cd4375a05a07476444d5819985007e34", 16),
+    ),
+    paranoid_pb2.CurveType.CURVE_SECP521R1: EcCurve(
+        name="secp521r1",
+        mod=int(
+            "686479766013060971498190079908139321726943530014330540939446"
+            "345918554318339765605212255964066145455497729631139148085803"
+            "7121987999716643812574028291115057151"
+        ),
+        n=int(
+            "686479766013060971498190079908139321726943530014330540939446"
+            "345918554318339765539424505774633321719753296399637136332111"
+            "3864768612440380340372808892707005449"
+        ),
+        a=-3,
+        b=int(
+            "51953eb9618e1c9a1f929a21a0b68540eea2da725b99b315f3b8b489918e"
+            "f109e156193951ec7e937b1652c0bd3bb1bf073573df883d2c34f1ef451f"
+            "d46b503f00",
+            16,
+        ),
+        gx=int(
+            "c6858e06b70404e9cd9e3ecb662395b4429c648139053fb521f828af606b"
+            "4d3dbaa14b5e77efe75928fe1dc127a2ffa8de3348b3c1856a429bf97e7e"
+            "31c2e5bd66",
+            16,
+        ),
+        gy=int(
+            "11839296a789a3bc0045c8a5fb42c7d1bd998f54449579b446817afbd172"
+            "73e662c97ee72995ef42640c550b9013fad0761353c7086a272c24088be9"
+            "4769fd16650",
+            16,
+        ),
+    ),
+    paranoid_pb2.CurveType.CURVE_SECP256K1: EcCurve(
+        name="secp256k1",
+        mod=2**256 - 2**32 - 977,
+        a=0,
+        b=7,
+        gx=int(
+            "79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798",
+            16,
+        ),
+        gy=int(
+            "483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8",
+            16,
+        ),
+        n=int(
+            "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141",
+            16,
+        ),
+        h=1,
+    ),
+    paranoid_pb2.CurveType.CURVE_BRAINPOOLP256R1: EcCurve(
+        name="brainpoolP256r1",
+        mod=int(
+            "A9FB57DBA1EEA9BC3E660A909D838D726E3BF623D52620282013481D1F6E5377",
+            16,
+        ),
+        a=int(
+            "7D5A0975FC2C3057EEF67530417AFFE7FB8055C126DC5C6CE94A4B44F330B5D9",
+            16,
+        ),
+        b=int(
+            "26DC5C6CE94A4B44F330B5D9BBD77CBF958416295CF7E1CE6BCCDC18FF8C07B6",
+            16,
+        ),
+        gx=int(
+            "8BD2AEB9CB7E57CB2C4B482FFC81B7AFB9DE27E1E3BD23C23A4453BD9ACE3262",
+            16,
+        ),
+        gy=int(
+            "547EF835C3DAC4FD97F8461A14611DC9C27745132DED8E545C1D54C72F046997",
+            16,
+        ),
+        n=int(
+            "A9FB57DBA1EEA9BC3E660A909D838D718C397AA3B561A6F7901E0E82974856A7",
+            16,
+        ),
+    ),
+    paranoid_pb2.CurveType.CURVE_BRAINPOOLP384R1: EcCurve(
+        name="brainpoolP384r1",
+        mod=int(
+            "8CB91E82A3386D280F5D6F7E50E641DF152F7109ED5456B412B1DA197FB7"
+            "1123ACD3A729901D1A71874700133107EC53",
+            16,
+        ),
+        a=int(
+            "7BC382C63D8C150C3C72080ACE05AFA0C2BEA28E4FB22787139165EFBA91"
+            "F90F8AA5814A503AD4EB04A8C7DD22CE2826",
+            16,
+        ),
+        b=int(
+            "04A8C7DD22CE28268B39B55416F0447C2FB77DE107DCD2A62E880EA53EEB"
+            "62D57CB4390295DBC9943AB78696FA504C11",
+            16,
+        ),
+        gx=int(
+            "1D1C64F068CF45FFA2A63A81B7C13F6B8847A3E77EF14FE3DB7FCAFE0CBD"
+            "10E8E826E03436D646AAEF87B2E247D4AF1E",
+            16,
+        ),
+        gy=int(
+            "8ABE1D7520F9C2A45CB1EB8E95CFD55262B70B29FEEC5864E19C054FF991"
+            "29280E4646217791811142820341263C5315",
+            16,
+        ),
+        n=int(
+            "8CB91E82A3386D280F5D6F7E50E641DF152F7109ED5456B31F166E6CAC04"
+            "25A7CF3AB6AF6B7FC3103B883202E9046565",
+            16,
+        ),
+        h=1,
+    ),
+    paranoid_pb2.CurveType.CURVE_BRAINPOOLP512R1: EcCurve(
+        name="brainpoolP512r1",
+        mod=int(
+            "AADD9DB8DBE9C48B3FD4E6AE33C9FC07CB308DB3B3C9D20ED6639CCA7033"
+            "08717D4D9B009BC66842AECDA12AE6A380E62881FF2F2D82C68528AA6056"
+            "583A48F3",
+            16,
+        ),
+        a=int(
+            "7830A3318B603B89E2327145AC234CC594CBDD8D3DF91610A83441CAEA98"
+            "63BC2DED5D5AA8253AA10A2EF1C98B9AC8B57F1117A72BF2C7B9E7C1AC4D"
+            "77FC94CA",
+            16,
+        ),
+        b=int(
+            "3DF91610A83441CAEA9863BC2DED5D5AA8253AA10A2EF1C98B9AC8B57F11"
+            "17A72BF2C7B9E7C1AC4D77FC94CADC083E67984050B75EBAE5DD2809BD63"
+            "8016F723",
+            16,
+        ),
+        gx=int(
+            "81AEE4BDD82ED9645A21322E9C4C6A9385ED9F70B5D916C1B43B62EEF4D0"
+            "098EFF3B1F78E2D0D48D50D1687B93B97D5F7C6D5047406A5E688B352209"
+            "BCB9F822",
+            16,
+        ),
+        gy=int(
+            "7DDE385D566332ECC0EABFA9CF7822FDF209F70024A57B1AA000C55B881F"
+            "8111B2DCDE494A5F485E5BCA4BD88A2763AED1CA2B2FA8F0540678CD1E0F"
+            "3AD80892",
+            16,
+        ),
+        n=int(
+            "AADD9DB8DBE9C48B3FD4E6AE33C9FC07CB308DB3B3C9D20ED6639CCA7033"
+            "0870553E5C414CA92619418661197FAC10471DB1D381085DDADDB5879682"
+            "9CA90069",
+            16,
+        ),
+        h=1,
+    ),
     # Curves over binary fields.
     # Semaev proposes an algorithm for computing DLs in his paper
     # "New algorithm for the discrete logarithm problem on elliptic curves"
     # https://arxiv.org/abs/1504.01175
     # Hence these curves should be avoided.
-    paranoid_pb2.CurveType.CURVE_SECT163K1:
-        None,
-    paranoid_pb2.CurveType.CURVE_SECT233K1:
-        None,
-    paranoid_pb2.CurveType.CURVE_SECT283K1:
-        None,
-    paranoid_pb2.CurveType.CURVE_SECT409K1:
-        None,
-    paranoid_pb2.CurveType.CURVE_SECT571K1:
-        None,
-    paranoid_pb2.CurveType.CURVE_SECT163R2:
-        None,
-    paranoid_pb2.CurveType.CURVE_SECT233R1:
-        None,
-    paranoid_pb2.CurveType.CURVE_SECT283R1:
-        None,
-    paranoid_pb2.CurveType.CURVE_SECT409R1:
-        None,
-    paranoid_pb2.CurveType.CURVE_SECT571R1:
-        None,
+    paranoid_pb2.CurveType.CURVE_SECT163K1: None,
+    paranoid_pb2.CurveType.CURVE_SECT233K1: None,
+    paranoid_pb2.CurveType.CURVE_SECT283K1: None,
+    paranoid_pb2.CurveType.CURVE_SECT409K1: None,
+    paranoid_pb2.CurveType.CURVE_SECT571K1: None,
+    paranoid_pb2.CurveType.CURVE_SECT163R2: None,
+    paranoid_pb2.CurveType.CURVE_SECT233R1: None,
+    paranoid_pb2.CurveType.CURVE_SECT283R1: None,
+    paranoid_pb2.CurveType.CURVE_SECT409R1: None,
+    paranoid_pb2.CurveType.CURVE_SECT571R1: None,
 }

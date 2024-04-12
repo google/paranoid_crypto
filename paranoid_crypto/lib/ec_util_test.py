@@ -16,7 +16,7 @@
 import random
 from absl.testing import absltest
 from absl.testing import parameterized
-import gmpy
+import gmpy2 as gmpy
 from paranoid_crypto import paranoid_pb2
 from paranoid_crypto.lib import ec_util
 from paranoid_crypto.lib import util
@@ -24,9 +24,11 @@ from paranoid_crypto.lib import util
 ec_key_secp256k1 = paranoid_pb2.ECKey()
 ec_key_secp256k1.ec_info.curve_type = paranoid_pb2.CurveType.CURVE_SECP256K1
 ec_key_secp256k1.ec_info.x = util.Hex2Bytes(
-    "c5d466e27280bb015418bdddbe6d74ba61fb54cdea23446ec966964c261361f1")
+    "c5d466e27280bb015418bdddbe6d74ba61fb54cdea23446ec966964c261361f1"
+)
 ec_key_secp256k1.ec_info.y = util.Hex2Bytes(
-    "0e16ea79206f8039a817854ce05284995b3968c6ff6e3de7e443690902a5e7c6")
+    "0e16ea79206f8039a817854ce05284995b3968c6ff6e3de7e443690902a5e7c6"
+)
 
 
 class EcUtilTest(parameterized.TestCase):
@@ -53,15 +55,19 @@ class EcUtilTest(parameterized.TestCase):
     self.assertTrue(c.OnCurve(c.g), "c.g must be on the curve")
     self.assertNotEqual(c.g, ec_util.INFINITY, "c.g must not be at infinity")
     self.assertEqual(
-        c.Multiply(c.g, c.n), ec_util.INFINITY,
-        "c.n should be the order of c.g")
+        c.Multiply(c.g, c.n), ec_util.INFINITY, "c.n should be the order of c.g"
+    )
     self.assertIn(c.h, (1, 2, 3, 4), "the cofactor should be small")
     # Hasse's theorem states that the  number of points on an elliptic curve
     # satisfies abs(c.n * h - (c.mod + 1)) <= 2*sqrt(c.mod).
-    self.assertLessEqual((c.n * c.h - (c.mod + 1))**2, 4 * c.mod,
-                         "Hasse's theorem is not satisfied")
-    self.assertNotEqual((4 * c.a**3 + 27 * c.b**2) % c.mod, 0,
-                        "The curve must not be singular")
+    self.assertLessEqual(
+        (c.n * c.h - (c.mod + 1)) ** 2,
+        4 * c.mod,
+        "Hasse's theorem is not satisfied",
+    )
+    self.assertNotEqual(
+        (4 * c.a**3 + 27 * c.b**2) % c.mod, 0, "The curve must not be singular"
+    )
 
   @parameterized.named_parameters(*curves)
   def testConversion(self, c: ec_util.EcCurve):
@@ -154,8 +160,9 @@ class EcUtilTest(parameterized.TestCase):
     sums, diffs = c.BatchAddSubtractX(c.g, points)
     for i, _ in enumerate(points):
       self.assertEqual(sums[i], c.Add(c.g, points[i])[0], "addition %d" % i)
-      self.assertEqual(diffs[i],
-                       c.Subtract(c.g, points[i])[0], "subtraction %d" % i)
+      self.assertEqual(
+          diffs[i], c.Subtract(c.g, points[i])[0], "subtraction %d" % i
+      )
 
   @parameterized.named_parameters(*curves)
   def testBatchMultiplyG(self, c: ec_util.EcCurve):
@@ -163,8 +170,9 @@ class EcUtilTest(parameterized.TestCase):
     points1 = [c.Multiply(c.g, x) for x in scalars]
     points2 = c.BatchMultiplyG(scalars)
     for i in range(len(points1)):
-      self.assertEqual(points1[i], points2[i],
-                       "i: %d, scalar: %d" % (i, scalars[i]))
+      self.assertEqual(
+          points1[i], points2[i], "i: %d, scalar: %d" % (i, scalars[i])
+      )
 
   @parameterized.named_parameters(*curves)
   def testBatchDL(self, c: ec_util.EcCurve):
@@ -184,7 +192,7 @@ class EcUtilTest(parameterized.TestCase):
     dl_bound = 2**32
     quad_words = c.n.bit_length() // 32
     dls = [random.randint(0, dl_bound) << (i * 32) for i in range(quad_words)]
-    mult = sum(2**(32 * i) for i in range(quad_words))
+    mult = sum(2 ** (32 * i) for i in range(quad_words))
     dls += [random.randint(0, dl_bound) * mult for i in range(4)]
     points = [c.Multiply(c.g, i) for i in dls]
     res = c.ExtendedBatchDL(points)
@@ -196,9 +204,12 @@ class EcUtilTest(parameterized.TestCase):
     max_difference = 2**16
     rand = [random.randint(0, c.n) for _ in range(4)]
     priv = [
-        rand[0], rand[1],
-        rand[0] + random.randint(-max_difference + 1, max_difference), rand[2],
-        rand[3], rand[1] + random.randint(-max_difference + 1, max_difference)
+        rand[0],
+        rand[1],
+        rand[0] + random.randint(-max_difference + 1, max_difference),
+        rand[2],
+        rand[3],
+        rand[1] + random.randint(-max_difference + 1, max_difference),
     ]
     points = [c.Multiply(c.g, p) for p in priv]
     new_points = points[:4]
@@ -222,8 +233,10 @@ class EcUtilTest(parameterized.TestCase):
     self.assertEqual(k, k2)
 
   def testPublicPoint(self):
-    point = (0xc5d466e27280bb015418bdddbe6d74ba61fb54cdea23446ec966964c261361f1,
-             0xe16ea79206f8039a817854ce05284995b3968c6ff6e3de7e443690902a5e7c6)
+    point = (
+        0xC5D466E27280BB015418BDDDBE6D74BA61FB54CDEA23446EC966964C261361F1,
+        0xE16EA79206F8039A817854CE05284995B3968C6FF6E3DE7E443690902A5E7C6,
+    )
     self.assertEqual(ec_util.PublicPoint(ec_key_secp256k1.ec_info), point)
 
 

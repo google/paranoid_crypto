@@ -14,7 +14,7 @@
 """Set of useful linear algebra functions."""
 
 from typing import Optional
-import gmpy
+import gmpy2 as gmpy
 
 
 def echelon_form(a: list[list[int]], b: Optional[list[int]] = None) -> int:
@@ -103,8 +103,9 @@ def echelon_form(a: list[list[int]], b: Optional[list[int]] = None) -> int:
   return rank
 
 
-def upper_triangular_solve(a: list[list[int]],
-                           b: list[int]) -> Optional[list[gmpy.mpq]]:
+def upper_triangular_solve(
+    a: list[list[int]], b: list[int]
+) -> Optional[list[gmpy.mpq]]:
   """Solves a matrix equation a*x = b, with a being an upper triangular matrix.
 
   Given an integer upper triangular matrix 'a' with m rows and m columns, and an

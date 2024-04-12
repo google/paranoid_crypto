@@ -17,7 +17,7 @@ import hashlib
 import math
 from typing import Optional
 from absl import logging
-import gmpy
+import gmpy2 as gmpy
 from paranoid_crypto import paranoid_pb2
 from paranoid_crypto.lib import base_check
 from paranoid_crypto.lib import consts
@@ -44,8 +44,11 @@ class CheckSizes(base_check.RSAKeyCheck):
       n = gmpy.mpz(util.Bytes2Int(key.rsa_info.n))
       weak = gmpy.bit_length(n) < 2048
       if weak:
-        logging.warning("Key size check failed! Size: %d\n%s",
-                        gmpy.bit_length(n), key.rsa_info)
+        logging.warning(
+            "Key size check failed! Size: %d\n%s",
+            gmpy.bit_length(n),
+            key.rsa_info,
+        )
         any_weak = True
         test_result.result = True
       util.SetTestResult(key.test_info, test_result)
@@ -64,8 +67,9 @@ class CheckExponents(base_check.RSAKeyCheck):
       test_result = self._CreateTestResult()
       e = gmpy.mpz(util.Bytes2Int(key.rsa_info.e))
       if e != 65537:
-        logging.warning("Exponent check failed! Exponent: %d\n%s", e,
-                        key.rsa_info)
+        logging.warning(
+            "Exponent check failed! Exponent: %d\n%s", e, key.rsa_info
+        )
         any_weak = True
         test_result.result = True
       util.SetTestResult(key.test_info, test_result)
@@ -232,13 +236,15 @@ class CheckContinuedFractions(base_check.RSAKeyCheck):
       ok, factors = rsa_util.CheckContinuedFraction(n, self._bound)
       if not ok:
         if factors:
-          logging.warning("Key factored! Factors: %s\n%s", factors,
-                          key.rsa_info)
+          logging.warning(
+              "Key factored! Factors: %s\n%s", factors, key.rsa_info
+          )
           util.AttachFactors(key.test_info, consts.INFO_NAME_N_FACTORS, factors)
         else:
           logging.warning(
               "Key with large coefficient in continued fraction:\n%s",
-              key.rsa_info)
+              key.rsa_info,
+          )
         any_weak = True
         test_result.result = True
       util.SetTestResult(key.test_info, test_result)
@@ -296,8 +302,9 @@ class CheckBitPatterns(base_check.RSAKeyCheck):
         d = 2**pattern_size - 1
         factors = rsa_util.CheckFraction(n, d)
         if factors:
-          logging.warning("Key factored! Factors: %s\n%s", factors,
-                          key.rsa_info)
+          logging.warning(
+              "Key factored! Factors: %s\n%s", factors, key.rsa_info
+          )
           util.AttachFactors(key.test_info, consts.INFO_NAME_N_FACTORS, factors)
           any_weak = True
           test_result.result = True
@@ -375,15 +382,17 @@ class CheckPermutedBitPatterns(base_check.RSAKeyCheck):
       for wsize in 8, 16, 32, 64:
         # bit size of the pattern without swapping
         for psize in range(3, wsize, 2):
-          d = int((2**psize - 1) * (2**(psize * wsize) + 1) // (2**wsize + 1))
+          d = int((2**psize - 1) * (2 ** (psize * wsize) + 1) // (2**wsize + 1))
           if d.bit_length() > max_dsize:
             break
           factors = rsa_util.CheckFraction(n, d)
           if factors:
-            logging.warning("Key factored! Factors: %s\n%s", factors,
-                            key.rsa_info)
-            util.AttachFactors(key.test_info, consts.INFO_NAME_N_FACTORS,
-                               factors)
+            logging.warning(
+                "Key factored! Factors: %s\n%s", factors, key.rsa_info
+            )
+            util.AttachFactors(
+                key.test_info, consts.INFO_NAME_N_FACTORS, factors
+            )
             any_weak = True
             test_result.result = True
             break
@@ -409,7 +418,7 @@ class CheckPollardpm1(base_check.RSAKeyCheck):
       # bound-powersmooth
       powers = list(map(gmpy.mpz, ntheory_util.Sieve(bound)))
       for i in range(len(powers)):
-        powers[i] = powers[i]**int(math.log(bound, powers[i]))
+        powers[i] = powers[i] ** int(math.log(bound, powers[i]))
       self._m = ntheory_util.FastProduct(powers)
     else:
       # Rough estimated values for finding factors of p - 1 up to 20 bits.
@@ -420,7 +429,7 @@ class CheckPollardpm1(base_check.RSAKeyCheck):
       # probability of appearing. Here we consider the first 150 prime numbers.
       # Larger primes have less probability of appearing, so we count just once.
       for i in range(150):
-        powers[i] = powers[i]**int(math.log(powersmooth, powers[i]))
+        powers[i] = powers[i] ** int(math.log(powersmooth, powers[i]))
       self._m = ntheory_util.FastProduct(powers)
 
   def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
@@ -431,12 +440,14 @@ class CheckPollardpm1(base_check.RSAKeyCheck):
       weak, factors = rsa_util.Pollardpm1(n, self._m)
       if weak:
         if factors:
-          logging.warning("Key factored! Factors: %s\n%s", factors,
-                          key.rsa_info)
+          logging.warning(
+              "Key factored! Factors: %s\n%s", factors, key.rsa_info
+          )
           util.AttachFactors(key.test_info, consts.INFO_NAME_N_FACTORS, factors)
         else:
-          logging.warning("Key may be vulnerable to Pollard p-1:\n%s",
-                          key.rsa_info)
+          logging.warning(
+              "Key may be vulnerable to Pollard p-1:\n%s", key.rsa_info
+          )
         any_weak = True
         test_result.result = True
       util.SetTestResult(key.test_info, test_result)
@@ -457,13 +468,15 @@ class CheckLowHammingWeight(base_check.RSAKeyCheck):
       weak, factors = rsa_util.CheckLowHammingWeight(n)
       if weak:
         if factors:
-          logging.warning("Key factored! Factors: %s\n%s", factors,
-                          key.rsa_info)
+          logging.warning(
+              "Key factored! Factors: %s\n%s", factors, key.rsa_info
+          )
           util.AttachFactors(key.test_info, consts.INFO_NAME_N_FACTORS, factors)
         else:
           logging.warning(
               "Key may be product of low Hamming weight primes:\n%s",
-              key.rsa_info)
+              key.rsa_info,
+          )
           # To distinguish between keys where the factorization was found and
           # keys where a product of low Hamming weight primes is only suspected
           # we use SEVERITY_UNKNOWN for the latter.
@@ -495,8 +508,8 @@ class CheckUnseededRand(base_check.RSAKeyCheck):
       list_unseeded_rands = self._storage.GetUnseededRands(psize)
       test_result = self._CreateTestResult()
 
-      msb_1 = 2**(psize - 1)
-      msb_11 = msb_1 | 2**(psize - 2)
+      msb_1 = 2 ** (psize - 1)
+      msb_11 = msb_1 | 2 ** (psize - 2)
       factors = None
       for p_0 in list_unseeded_rands:
         # Also test with the most significant bits set to 1.
@@ -505,8 +518,9 @@ class CheckUnseededRand(base_check.RSAKeyCheck):
           if factors:
             break
         if factors:
-          logging.warning("Key factored! Factors: %s\n%s", factors,
-                          key.rsa_info)
+          logging.warning(
+              "Key factored! Factors: %s\n%s", factors, key.rsa_info
+          )
           util.AttachFactors(key.test_info, consts.INFO_NAME_N_FACTORS, factors)
           any_weak = True
           test_result.result = True

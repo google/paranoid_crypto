@@ -15,7 +15,7 @@
 
 import itertools
 from typing import Optional
-import gmpy
+import gmpy2 as gmpy
 
 
 def FastProduct(values: list[int]) -> int:
@@ -80,7 +80,7 @@ def Inverse2exp(n: int, k: int) -> Optional[int]:
     # Hence 2**(2*t) divides (a * n - 1)**2 = a * n * (a * n - 2) + 1,
     # and hence a * n * (2 - a * n) % 2**(2*t) == 1.
     t = min(k, 2 * t)
-    a = gmpy.lowbits(a * (2 - a * n), t)
+    a = gmpy.f_mod_2exp(a * (2 - a * n), t)
   return a
 
 
@@ -122,7 +122,7 @@ def InverseSqrt2exp(n: int, k: int) -> Optional[int]:
     # This is equivalant to the claim that the loop invariant holds after the
     # loop.
     t = min(k, 2 * t - 2)
-    a = gmpy.lowbits(a * (3 - a * a * n) // 2, t)
+    a = gmpy.f_mod_2exp(a * (3 - a * a * n) // 2, t)
   return a
 
 
@@ -154,8 +154,8 @@ def Sqrt2exp(n: int, k: int) -> list[int]:
   roots = [
       r,
       int(2**k - r),
-      gmpy.lowbits((2**(k - 1) - r), k),
-      gmpy.lowbits((2**(k - 1) + r), k)
+      gmpy.f_mod_2exp((2 ** (k - 1) - r), k),
+      gmpy.f_mod_2exp((2 ** (k - 1) + r), k),
   ]
   return roots
 
@@ -203,7 +203,7 @@ def DivmodRounded(a: int, b: int) -> tuple[int, int]:
 def Sieve(n: int) -> list[int]:
   """Using Sieve of Eratosthenes, returns all primes lower than n."""
   table = [True] * n
-  for i in range(2, gmpy.sqrt(n) + 1):
+  for i in range(2, gmpy.isqrt(n) + 1):
     if table[i]:
       for j in range(i * i, n, i):
         table[j] = False

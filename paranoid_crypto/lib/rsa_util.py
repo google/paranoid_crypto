@@ -15,14 +15,15 @@
 
 import heapq
 from typing import Optional
-import gmpy
+import gmpy2 as gmpy
 from paranoid_crypto.lib import lll
 from paranoid_crypto.lib import ntheory_util
 from paranoid_crypto.lib import special_case_factoring
 
 
-def BatchGCD(values: list[int],
-             other_values_prod: Optional[int] = None) -> list[int]:
+def BatchGCD(
+    values: list[int], other_values_prod: Optional[int] = None
+) -> list[int]:
   """Returns a list with the GCD for each number with all the other values.
 
   Args:
@@ -74,7 +75,7 @@ def FermatFactor(n: int, max_steps: int) -> Optional[tuple[int, int]]:
   if n % 2 == 0:
     return 2, n // 2
 
-  a = gmpy.sqrt(n)
+  a = gmpy.isqrt(n)
   if a * a == n:
     return a, a
 
@@ -83,7 +84,7 @@ def FermatFactor(n: int, max_steps: int) -> Optional[tuple[int, int]]:
 
   for _ in range(max_steps):
     if gmpy.is_square(b2):
-      return a + gmpy.sqrt(b2), a - gmpy.sqrt(b2)
+      return a + gmpy.isqrt(b2), a - gmpy.isqrt(b2)
 
     # or a += 1; b2 = a * a - n
     b2 += a
@@ -93,8 +94,9 @@ def FermatFactor(n: int, max_steps: int) -> Optional[tuple[int, int]]:
   return None
 
 
-def FactorHighAndLowBitsEqual(n: int,
-                              middle_bits: int = 3) -> Optional[list[int]]:
+def FactorHighAndLowBitsEqual(
+    n: int, middle_bits: int = 3
+) -> Optional[list[int]]:
   """Factors n = p*q if p and q share sufficiently many high and low bits.
 
   This function factors n if about n.bit_length() / 4 of the high bits and
@@ -169,7 +171,7 @@ def FactorHighAndLowBitsEqual(n: int,
     raise ArithmeticError("expecting that square root exists")
 
   # approximation of (p+q)/2 if p is close to q.
-  a = gmpy.sqrt(n - 1) + 1
+  a = gmpy.isqrt(n - 1) + 1
   for r in [r0, 2**k - r0]:
     s = a
     for i in range(k):
@@ -184,10 +186,10 @@ def FactorHighAndLowBitsEqual(n: int,
         # a or r respectively.
         m = min(middle_bits, i)
         for _ in range(2**m):
-          s += 2**(i - m)
+          s += 2 ** (i - m)
           d = s**2 - n
           if gmpy.is_square(d):
-            d_sqrt = gmpy.sqrt(d)
+            d_sqrt = gmpy.isqrt(d)
             return [s - d_sqrt, s + d_sqrt]
       # Loop invariants:
       # assert (s - r) % 2**i == 0
@@ -277,14 +279,14 @@ def CheckContinuedFraction(n: int, bound: int) -> tuple[bool, list[int]]:
       The test can fail even if no factors were found, but the continued
       fraction has a large coefficient.
   """
-  m = 2**n.bit_length()
+  m = 2 ** n.bit_length()
   cf = ntheory_util.ContinuedFraction(n, m)
-  x = 2**(n.bit_length() // 2)
+  x = 2 ** (n.bit_length() // 2)
   for quot, _, v in cf:
     r, c = ntheory_util.DivmodRounded(n * v, x)
     a, b = ntheory_util.DivmodRounded(r, x)
     if a and c and gmpy.is_square(b * b - 4 * a * c):
-      t = gmpy.sqrt(b * b - 4 * a * c)
+      t = gmpy.isqrt(b * b - 4 * a * c)
       for rt in (t, -t):
         p = gmpy.gcd(n, 2 * a * x + b + rt)
         if 1 < p < n:
@@ -365,9 +367,9 @@ def CheckFraction(n: int, d0: int = 1) -> list[int]:
     non-trivial factors of n if this method was able to factor n or
     an empty list if the attempt was unsuccessful.
   """
-  w = 2**(n.bit_length() // 2)
+  w = 2 ** (n.bit_length() // 2)
   u, v = divmod(n, w)
-  x = 2**d0.bit_length()
+  x = 2 ** d0.bit_length()
   lat = [[x, 0, u * d0 % w], [0, x, v * d0 % w], [0, 0, w]]
   for v in lll.reduce(lat):
     cx, ax = v[0], -v[1]
@@ -403,21 +405,25 @@ def CheckSmallUpperDifferences(n: int) -> Optional[list[int]]:
   # 2 ** (prime_size - 100) checks for misunderstanding the bound required
   # by NIST. The other values check for similar bugs.
   differences = [
-      2**(prime_size - 100), 2**(prime_size - 128), 2**(prime_size - 160),
-      2**(prime_size - 256), 2**(prime_size - 2), 2**(prime_size - 3)
+      2 ** (prime_size - 100),
+      2 ** (prime_size - 128),
+      2 ** (prime_size - 160),
+      2 ** (prime_size - 256),
+      2 ** (prime_size - 2),
+      2 ** (prime_size - 3),
   ]
   for diff in differences:
     # find an approximation p0 for p such that p - n // q is approx. diff.
-    p0 = gmpy.sqrt(n + (diff // 2)**2) + diff // 2
+    p0 = gmpy.isqrt(n + (diff // 2) ** 2) + diff // 2
     factors = special_case_factoring.FactorWithGuess(n, p0)
     if factors:
       return factors
   return None
 
 
-def Pollardpm1(n: int,
-               m: Optional[int] = None,
-               gcd_bound: int = 2**60) -> tuple[bool, list[int]]:
+def Pollardpm1(
+    n: int, m: Optional[int] = None, gcd_bound: int = 2**60
+) -> tuple[bool, list[int]]:
   """Checks if an RSA modulus is factorable by pollard p-1 method.
 
   Pollard's p-1 algorithm finds factors when the number preceding the factor,
@@ -469,11 +475,10 @@ def Pollardpm1(n: int,
   return False, []
 
 
-def CheckLowHammingWeight(n: int,
-                          cutoff: int = 2500,
-                          maxsteps: int = 10**6) -> tuple[bool, list[int]]:
+def CheckLowHammingWeight(
+    n: int, cutoff: int = 2500, maxsteps: int = 10**6
+) -> tuple[bool, list[int]]:
   """Tries to factor n assuming that the factors have a low Hamming weight.
-
 
   This algorithm is loosly based on crackpot claims that the bit
   patterns for the prime factors can be derived from the bit pattern

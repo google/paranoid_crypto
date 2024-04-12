@@ -22,10 +22,13 @@ class RngTest(absltest.TestCase):
 
   def testShake128(self):
     """Regression test."""
-    self.assertEqual(0xc8f3374f0a636c707e324ddc0486f8a1cac5f01c,
-                     rng.Shake128().RandomBits(160, seed=123456))
-    self.assertEqual(0x6b3cca5933ce20,
-                     rng.Shake128().RandomBits(55, seed=0xabcdef))
+    self.assertEqual(
+        0xC8F3374F0A636C707E324DDC0486F8A1CAC5F01C,
+        rng.Shake128().RandomBits(160, seed=123456),
+    )
+    self.assertEqual(
+        0x6B3CCA5933CE20, rng.Shake128().RandomBits(55, seed=0xABCDEF)
+    )
 
   def testMt19937(self):
     """Regression test.
@@ -35,76 +38,95 @@ class RngTest(absltest.TestCase):
     There is of course no guarantee that python continues to use this
     pseudorandom number generator.
     """
-    self.assertEqual(0xcb47d804530bce3d9460,
-                     rng.Mt19937().RandomBits(80, seed=123456))
+    self.assertEqual(
+        0xCB47D804530BCE3D9460, rng.Mt19937().RandomBits(80, seed=123456)
+    )
 
-  def testGmp(self):
-    """Regression test.
+  def testTruncLcg(self):
+    """Regression test."""
 
-    The sole purpose of this test is to detect changes in gmpy.rand, so that
-    other unit tests based on the weaknesses of gmpy.rand can be adjusted.
-    """
-    self.assertEqual(0x43eca180f7892ceb,
-                     rng.GmpRand(16).RandomBits(63, seed=123456))
-    self.assertEqual(0x7bd2b404e4b92216,
-                     rng.GmpRand(20).RandomBits(63, seed=123456))
-    self.assertEqual(0x1759df573d27d9be,
-                     rng.GmpRand(28).RandomBits(63, seed=123456))
-    self.assertEqual(0x2af9a4aca4686baf,
-                     rng.GmpRand(32).RandomBits(63, seed=123456))
-    self.assertEqual(0x2cf869f9ae314763,
-                     rng.GmpRand(64).RandomBits(63, seed=123456))
-    self.assertEqual(0x66af6d53fe71fa68,
-                     rng.GmpRand(128).RandomBits(63, seed=123456))
+    self.assertEqual(
+        0x61BD2B29909C8E52, rng.TruncLcgRand(16).RandomBits(63, seed=123456)
+    )
+    self.assertEqual(
+        0xA3A607D44D04A862, rng.TruncLcgRand(20).RandomBits(63, seed=123456)
+    )
+    self.assertEqual(
+        0xA5EC19808421926, rng.TruncLcgRand(28).RandomBits(63, seed=123456)
+    )
+    self.assertEqual(
+        0xCB8975DC5D19C51C, rng.TruncLcgRand(32).RandomBits(63, seed=123456)
+    )
+    self.assertEqual(
+        0x567EE71B6DE6B032, rng.TruncLcgRand(64).RandomBits(63, seed=123456)
+    )
+    self.assertEqual(
+        0xCC314CF91CC12913, rng.TruncLcgRand(128).RandomBits(63, seed=123456)
+    )
 
   def testJavaRandom(self):
     """Compares the implementation with output from java.util.random."""
     expected = [
-        0, 0xfffb, 0x4fffb5cf5, 0xcfffb5cf57358, 0x1cfffb5cf573588ff9,
-        0x1cfffb5cf573588ff904b2, 0x1cfffb5cf573588ff904b225b2,
-        0x1cfffb5cf573588ff904b225b2c3ab, 0xfffb5cf573588ff904b225b2c3ab76faa1,
-        0xfffb5cf573588ff904b225b2c3ab76faa1dd3c,
-        0x4fffb5cf573588ff904b225b2c3ab76faa1dd3c916e,
-        0xcfffb5cf573588ff904b225b2c3ab76faa1dd3c916e80d5,
-        0x1cfffb5cf573588ff904b225b2c3ab76faa1dd3c916e80d5dc77,
-        0x1cfffb5cf573588ff904b225b2c3ab76faa1dd3c916e80d5dc770f55,
-        0x1cfffb5cf573588ff904b225b2c3ab76faa1dd3c916e80d5dc770f555453
+        0,
+        0xFFFB,
+        0x4FFFB5CF5,
+        0xCFFFB5CF57358,
+        0x1CFFFB5CF573588FF9,
+        0x1CFFFB5CF573588FF904B2,
+        0x1CFFFB5CF573588FF904B225B2,
+        0x1CFFFB5CF573588FF904B225B2C3AB,
+        0xFFFB5CF573588FF904B225B2C3AB76FAA1,
+        0xFFFB5CF573588FF904B225B2C3AB76FAA1DD3C,
+        0x4FFFB5CF573588FF904B225B2C3AB76FAA1DD3C916E,
+        0xCFFFB5CF573588FF904B225B2C3AB76FAA1DD3C916E80D5,
+        0x1CFFFB5CF573588FF904B225B2C3AB76FAA1DD3C916E80D5DC77,
+        0x1CFFFB5CF573588FF904B225B2C3AB76FAA1DD3C916E80D5DC770F55,
+        0x1CFFFB5CF573588FF904B225B2C3AB76FAA1DD3C916E80D5DC770F555453,
     ]
 
     for i, val in enumerate(expected):
-      computed = rng.JavaRandom().RandomBits(i * 17 + 1, seed=0x123456789abd)
+      computed = rng.JavaRandom().RandomBits(i * 17 + 1, seed=0x123456789ABD)
       self.assertEqual(val, computed)
 
   def testLcgNist(self):
     """Regression test."""
 
-    self.assertEqual(0xe188f824e2f099626e91b7ff11b5fdfe1faf1422,
-                     rng.LcgNist().RandomBits(160, seed=0x0123456))
+    self.assertEqual(
+        0xE188F824E2F099626E91B7FF11B5FDFE1FAF1422,
+        rng.LcgNist().RandomBits(160, seed=0x0123456),
+    )
 
   def testXorShift128plus(self):
     """Regression test."""
 
     self.assertEqual(
-        0x333a495b2b503b50a3c8f042002468acf4d2a660,
-        rng.XorShift128plus().RandomBits(160, seed=0x012345678abcdef))
+        0x333A495B2B503B50A3C8F042002468ACF4D2A660,
+        rng.XorShift128plus().RandomBits(160, seed=0x012345678ABCDEF),
+    )
 
   def testXorShiftStar(self):
     """Regression test."""
 
-    self.assertEqual(0x12e8ff6895348ec343d28dade786d9e2b304bba0,
-                     rng.XorShiftStar().RandomBits(160, seed=0x012345678abcdef))
+    self.assertEqual(
+        0x12E8FF6895348EC343D28DADE786D9E2B304BBA0,
+        rng.XorShiftStar().RandomBits(160, seed=0x012345678ABCDEF),
+    )
 
   def testXorwow(self):
     """Regression test."""
 
-    self.assertEqual(0xe149f7eeb555653ee50f1ba9d36baab4f217131f,
-                     rng.Xorwow().RandomBits(160, seed=0x012345678abcdef))
+    self.assertEqual(
+        0xE149F7EEB555653EE50F1BA9D36BAAB4F217131F,
+        rng.Xorwow().RandomBits(160, seed=0x012345678ABCDEF),
+    )
 
   def testPcg64(self):
     """Regression test."""
 
-    self.assertEqual(0xd6d4f1d8380b2c570c609a1321e50190f3b7b142,
-                     rng.Pcg64().RandomBits(160, seed=0x012345678abcdef))
+    self.assertEqual(
+        0xD6D4F1D8380B2C570C609A1321E50190F3B7B142,
+        rng.Pcg64().RandomBits(160, seed=0x012345678ABCDEF),
+    )
 
   def testPcg64ByteOrder(self):
     """Checks that the implementation uses the correct byte order.
@@ -125,42 +147,57 @@ class RngTest(absltest.TestCase):
   def testPhilox(self):
     """Regression test."""
 
-    self.assertEqual(0xe87dba10d9f9d6ff35934f8c5bd85eeaeb4e1c12,
-                     rng.Philox().RandomBits(160, seed=0x012345678abcdef))
+    self.assertEqual(
+        0xE87DBA10D9F9D6FF35934F8C5BD85EEAEB4E1C12,
+        rng.Philox().RandomBits(160, seed=0x012345678ABCDEF),
+    )
 
   def testSfc64(self):
     """Regression test."""
 
-    self.assertEqual(0x81e0f5fd864a75c6300282602ed9594f3bcef03d,
-                     rng.Sfc64().RandomBits(160, seed=0x012345678abcdef))
+    self.assertEqual(
+        0x81E0F5FD864A75C6300282602ED9594F3BCEF03D,
+        rng.Sfc64().RandomBits(160, seed=0x012345678ABCDEF),
+    )
 
   def testMwc(self):
     """Regression test."""
 
     self.assertEqual(
-        0xc5c2dffcef49f52eaa40f50acb3c4d5e3e091d46,
-        rng.GetRng('mwc64').RandomBits(160, seed=0x012345678abcdef))
+        0xC5C2DFFCEF49F52EAA40F50ACB3C4D5E3E091D46,
+        rng.GetRng('mwc64').RandomBits(160, seed=0x012345678ABCDEF),
+    )
     self.assertEqual(
-        0xf46fdcec16c16c1406c197c16c16c16c16c197f0,
+        0xF46FDCEC16C16C1406C197C16C16C16C16C197F0,
         rng.GetRng('mwc128').RandomBits(
-            160, seed=0x012345678abcdef0123456789abcdef))
+            160, seed=0x012345678ABCDEF0123456789ABCDEF
+        ),
+    )
     self.assertEqual(
         int(
             '579c359b7071efead74320feb68989c854320feb'
-            '68989cadd74320feb68989c854320feb68989cae', 16),
+            '68989cadd74320feb68989c854320feb68989cae',
+            16,
+        ),
         rng.GetRng('mwc256').RandomBits(
-            320, seed=0x012345678abcdef012345678abcdef * (1 + 2**128)))
+            320, seed=0x012345678ABCDEF012345678ABCDEF * (1 + 2**128)
+        ),
+    )
     self.assertEqual(
         int(
             '0d2f517395b7d9fc1e40627f01d8c5fc'
             '620fedc935767b7320fedc935767b9a8'
             '97867564534231200efdecdbcabc1ccd'
             '620fedc935767b7320fedc935767b9a8'
-            '97867564534231200efdecdbcabc1cd0', 16),
+            '97867564534231200efdecdbcabc1cd0',
+            16,
+        ),
         rng.GetRng('mwc512').RandomBits(
             640,
-            seed=0x012345678abcdef012345678abcdef00112233445566778899aabbccddeeff
-            * (1 + 2**256)))
+            seed=0x012345678ABCDEF012345678ABCDEF00112233445566778899AABBCCDDEEFF
+            * (1 + 2**256),
+        ),
+    )
 
 
 if __name__ == '__main__':

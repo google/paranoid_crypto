@@ -14,7 +14,7 @@
 """Module containing Paranoid checks on group of RSA keys by aggregation."""
 
 from absl import logging
-import gmpy
+import gmpy2 as gmpy
 from paranoid_crypto import paranoid_pb2
 from paranoid_crypto.lib import base_check
 from paranoid_crypto.lib import consts
@@ -99,10 +99,12 @@ class CheckGCDN1(base_check.RSAKeyCheck):
     for i, key in enumerate(artifacts):
       test_result = self._CreateTestResult()
       if gcds[i] >= self._gcd_bound:
-        logging.warning("GCD N-1 check failed! GCD: %x\n%s", gcds[i],
-                        key.rsa_info)
-        util.AttachFactors(key.test_info, consts.INFO_NAME_NM1_FACTORS,
-                           [gcds[i]])
+        logging.warning(
+            "GCD N-1 check failed! GCD: %x\n%s", gcds[i], key.rsa_info
+        )
+        util.AttachFactors(
+            key.test_info, consts.INFO_NAME_NM1_FACTORS, [gcds[i]]
+        )
         any_weak = True
         test_result.result = True
       util.SetTestResult(key.test_info, test_result)

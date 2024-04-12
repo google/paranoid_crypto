@@ -15,7 +15,7 @@
 
 import itertools
 from typing import Optional
-import gmpy
+import gmpy2 as gmpy
 from paranoid_crypto.lib import linalg_util
 from paranoid_crypto.lib import lll
 import sympy
@@ -26,7 +26,7 @@ def _get_monomials(f: sympy.Poly) -> list[sympy.Poly]:
   for exps in f.monoms():
     mon = 1
     for i in range(len(exps)):
-      mon *= f.gens[i]**exps[i]
+      mon *= f.gens[i] ** exps[i]
     mons.append(sympy.Poly(mon, *f.gens))
   return mons
 
@@ -77,7 +77,7 @@ def univariate_modp(f: sympy.Poly, b: int, k: int = 3) -> Optional[int]:
   xb = sympy.Poly(x * b)
   t = fz.compose(xb)
   for i in range(k):
-    g = t**i * n**(k - i)
+    g = t**i * n ** (k - i)
     for j in range(d):
       pols.append(xb**j * g)
   g = t**k
@@ -107,9 +107,9 @@ def univariate_modp(f: sympy.Poly, b: int, k: int = 3) -> Optional[int]:
   return None
 
 
-def multivariate_modp(f: sympy.Poly,
-                      bounds: list[int],
-                      m: int = 4) -> Optional[list[int]]:
+def multivariate_modp(
+    f: sympy.Poly, bounds: list[int], m: int = 4
+) -> Optional[list[int]]:
   """Returns small roots of a multivariate polynomial modulo an unknown factor.
 
   Proposal of M. Herrmann and A. May., 'Solving Linear Equations Modulo
@@ -167,7 +167,7 @@ def multivariate_modp(f: sympy.Poly,
   l = len(xs)
   # Herrmann and May suggest optimzed value t = tau*m, where
   # tau = 1-(1-beta)**(1/l). Assuming balanced RSA modulus, beta = 0.5:
-  t = max(1, int((1 - (0.5)**(1 / l)) * m))
+  t = max(1, int((1 - (0.5) ** (1 / l)) * m))
 
   # Compute polynomials. Each polynomial adds a new monomial.
   pols = []
@@ -175,12 +175,12 @@ def multivariate_modp(f: sympy.Poly,
   all_idxs = list(itertools.product(range(m + 1), repeat=l - 1))
   for k in range(m + 1):
     idxs = [idx for idx in all_idxs if sum(idx) <= m - k]
-    g = fz**k * n**max(t - k, 0)
-    mon = xs[0]**k
+    g = fz**k * n ** max(t - k, 0)
+    mon = xs[0] ** k
     for ijs in idxs:
       t1 = 1
       for i in range(1, l):
-        t1 *= xs[i]**ijs[i - 1]
+        t1 *= xs[i] ** ijs[i - 1]
       pols.append(t1 * g)
       mons.append(t1 * mon)
   dim = len(pols)
@@ -225,9 +225,9 @@ def multivariate_modp(f: sympy.Poly,
   return None
 
 
-def multivariate_modn(f: sympy.Poly,
-                      bounds: list[int],
-                      m: int = 1) -> Optional[list[int]]:
+def multivariate_modn(
+    f: sympy.Poly, bounds: list[int], m: int = 1
+) -> Optional[list[int]]:
   """Returns small roots of a multivariate polynomial modulo an integer.
 
   Proposal of E. Jochemsz and A. May., 'A Strategy for Finding Roots of
@@ -273,7 +273,7 @@ def multivariate_modn(f: sympy.Poly,
   mks = []
   mons = _get_monomials(fz**m)
   for k in range(m + 1):
-    fmk_mons = _get_monomials(fz**(m - k))
+    fmk_mons = _get_monomials(fz ** (m - k))
     mk = {mon for mon in mons if mon // l**k in fmk_mons}
     mks.append(mk)
   mks.append(set())
@@ -281,7 +281,7 @@ def multivariate_modn(f: sympy.Poly,
   pols = []
   for k in range(m + 1):
     diffs = mks[k] - mks[k + 1]
-    g = fz**k * n**(m - k)
+    g = fz**k * n ** (m - k)
     for mon in diffs:
       pols.append((mon // l**k) * g)
   dim = len(pols)

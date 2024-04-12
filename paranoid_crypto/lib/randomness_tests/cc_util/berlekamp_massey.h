@@ -14,6 +14,7 @@
 
 #ifndef PARANOID_CRYPTO_LIB_RANDOMNESS_TESTS_CC_UTIL_BERLEKAMP_MASSEY_H_
 #define PARANOID_CRYPTO_LIB_RANDOMNESS_TESTS_CC_UTIL_BERLEKAMP_MASSEY_H_
+#include <cstdint>
 #include <string>
 #include <vector>
 

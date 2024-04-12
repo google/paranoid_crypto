@@ -21,12 +21,12 @@ import hashlib
 from cryptography.hazmat.primitives import ciphers
 from cryptography.hazmat.primitives.ciphers import algorithms
 from cryptography.hazmat.primitives.ciphers import modes
-import gmpy
+import gmpy2 as gmpy
 
 GCD_30_DELTA = [6, 4, 2, 4, 2, 4, 6, 2]
 
 
-class Generator():
+class Generator:
   """Class for generating Keypair modulus for a given seed and bit size."""
 
   def __init__(self, seed: bytes):
@@ -60,18 +60,20 @@ class Generator():
       idx = 0
       while len(prime_bytes) <= p_size_bytes:
         # Add chunk
-        encryptor = ciphers.Cipher(algorithms.AES(self.key),
-                                   modes.ECB()).encryptor()
+        encryptor = ciphers.Cipher(
+            algorithms.AES(self.key), modes.ECB()
+        ).encryptor()
         prime_bytes += encryptor.update(self.seed)
         # Update key and seed
         seed_inc = (int.from_bytes(self.seed, 'big') + 1).to_bytes(16, 'big')
         self.key = encryptor.update(seed_inc)
-        encryptor = ciphers.Cipher(algorithms.AES(self.key),
-                                   modes.ECB()).encryptor()
+        encryptor = ciphers.Cipher(
+            algorithms.AES(self.key), modes.ECB()
+        ).encryptor()
         self.seed = encryptor.update(seed_inc)
 
       # Discard first and last bytes
-      prime_bytes = prime_bytes[1:p_size_bytes + 1]
+      prime_bytes = prime_bytes[1 : p_size_bytes + 1]
       p = int.from_bytes(prime_bytes, 'big')
       p |= 1 << (p_size_bits - 1)  # Set MSB
       p += 31 - p % 30  # Align number on 30k+1 boundary

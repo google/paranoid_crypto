@@ -16,7 +16,7 @@
 import array
 from collections.abc import Iterator
 import math
-import gmpy
+import gmpy2 as gmpy
 import numpy
 from scipy import fftpack as scipy_fft
 from scipy import special as scipy_special
@@ -120,7 +120,7 @@ def UniformSumCdf(n: int, x: float) -> float:
     binom = 1  # Binomial(n, k)
     f = math.factorial(n)
     for k in range(math.floor(x) + 1):
-      t = sign * binom / f * (x - k)**n
+      t = sign * binom / f * (x - k) ** n
       p_value += t
       sign = -sign
       binom = binom * (n - k) // (k + 1)
@@ -228,10 +228,9 @@ def Bits(seq: int, length: int) -> array.array:
   return res
 
 
-def SubSequences(seq: int,
-                 length: int,
-                 m: int,
-                 wrap: bool = True) -> Iterator[int]:
+def SubSequences(
+    seq: int, length: int, m: int, wrap: bool = True
+) -> Iterator[int]:
   """Yields all m-bit subsequences of seq.
 
   The order of the subsequences is not defined. The same subsequence
@@ -262,7 +261,7 @@ def SubSequences(seq: int,
     s = (seq >> (length - m)) & mask
   else:
     start = m
-    s = int.from_bytes(ba[:(start + 7) // 8], "little")
+    s = int.from_bytes(ba[: (start + 7) // 8], "little")
     yield s & mask
   for i in range(start, length):
     if i & 7 == 0:
@@ -271,10 +270,9 @@ def SubSequences(seq: int,
     yield s & mask
 
 
-def FrequencyCount(seq: int,
-                   length: int,
-                   m: int,
-                   wrap: bool = True) -> list[int]:
+def FrequencyCount(
+    seq: int, length: int, m: int, wrap: bool = True
+) -> list[int]:
   """Counts the number of occurrences of m-bit subsequences of seq.
 
   The bit string seq is assumed to be a loop. Hence subsequences
@@ -380,12 +378,12 @@ def SplitSequence(seq: int, length: int, m: int) -> list[int]:
     # If m is divisible by 8 then it is possible to use byte arrays to speed
     # up the splitting. Using structs for m=8, 16, 32 or 64 is even faster.
     for i in range(n):
-      res[i] = int.from_bytes(ba[i * m // 8:(i + 1) * m // 8], "little")
+      res[i] = int.from_bytes(ba[i * m // 8 : (i + 1) * m // 8], "little")
   else:
     mask = (1 << m) - 1
     for i in range(n):
-      val = int.from_bytes(ba[i * m // 8:(i + 1) * m // 8 + 1], "little")
-      val >>= ((i * m) & 7)
+      val = int.from_bytes(ba[i * m // 8 : (i + 1) * m // 8 + 1], "little")
+      val >>= (i * m) & 7
       res[i] = val & mask
   return res
 
@@ -400,7 +398,6 @@ def Scatter(seq: int, m: int) -> list[int]:
   Returns:
     a list of bit strings, where the i-th value of the result contains the bits
     i, i+m, i+2*m, ... of the input seq.
-
   """
   # Special case to avoid calling int('', 2)
   if seq.bit_length() < m:

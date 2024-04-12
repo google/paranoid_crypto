@@ -18,7 +18,7 @@ if partial information about the prime numbers is known.
 """
 
 from typing import Optional
-import gmpy
+import gmpy2 as gmpy
 from paranoid_crypto.lib import ntheory_util
 
 
@@ -61,7 +61,6 @@ def FactorWithGuess(n: int, p_0: int) -> Optional[list[int]]:
 
   Returns:
     A factorization [p, q] of n or None if no factor could be found.
-
   """
   q_0 = n // p_0
 
@@ -70,7 +69,7 @@ def FactorWithGuess(n: int, p_0: int) -> Optional[list[int]]:
   # To avoid this the cube root of n // 2**(3*shift) is computed instead.
   bits = n.bit_length()
   shift = max(0, (bits // 3) - 52)
-  bound = int((n >> (3 * shift))**(1 / 3)) << shift
+  bound = int((n >> (3 * shift)) ** (1 / 3)) << shift
 
   for _, u, v in ntheory_util.ContinuedFraction(p_0, q_0):
     # An approximation u / v of p_0 / q_0 is good enough for this factoring
@@ -84,11 +83,11 @@ def FactorWithGuess(n: int, p_0: int) -> Optional[list[int]]:
     # odd.
     if abs(u * q_0 - v * p_0) < bound:
       d = 4 * u * v * n
-      a = gmpy.sqrt(d)
+      a = gmpy.isqrt(d)
       if a * a < d:
         a += 1
       if gmpy.is_square(a * a - d):
-        b = gmpy.sqrt(a * a - d)
+        b = gmpy.isqrt(a * a - d)
         g = gmpy.gcd(a + b, n)
         if 1 < g < n:
           return [g, n // g]
