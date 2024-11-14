@@ -310,7 +310,7 @@ def TestSource(source: Source,
 
   if not tests:
     logging.info("no tests specified")
-    return
+    return  # pytype: disable=bad-return-type
 
   undecided = len(tests)
   while undecided:
