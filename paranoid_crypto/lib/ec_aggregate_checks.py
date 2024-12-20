@@ -29,7 +29,7 @@ class CheckECKeySmallDifference(base_check.ECKeyCheck):
   generation, that generated the keys is badly broken.
   """
 
-  def __init__(self, max_diff: int = 2**24):
+  def __init__(self, max_diff: int = 2**8):
     """CheckECKeySmallDifference check constructor.
 
     Args:
@@ -52,10 +52,12 @@ class CheckECKeySmallDifference(base_check.ECKeyCheck):
       for i, key in enumerate(keys):
         test_result = self._CreateTestResult()
         if result[i] is not None:
-          logging.warning("Keys with small difference found: %s %s", result[i],
-                          key.ec_info)
-          util.AttachInfo(key.test_info, consts.INFO_NAME_DISCRETE_LOG_DIFF,
-                          result[i])
+          logging.warning(
+              "Keys with small difference found: %s %s", result[i], key.ec_info
+          )
+          util.AttachInfo(
+              key.test_info, consts.INFO_NAME_DISCRETE_LOG_DIFF, result[i]
+          )
           any_weak = True
           test_result.result = True
         util.SetTestResult(key.test_info, test_result)
