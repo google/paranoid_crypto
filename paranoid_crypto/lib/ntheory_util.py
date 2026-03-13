@@ -143,21 +143,22 @@ def Sqrt2exp(n: int, k: int) -> list[int]:
   """
   if n % 2 == 0 or k < 0:
     raise ValueError("Not implemented for even inputs or negative k")
-  # Speical case for k < 3, since the code below assumes k >= 3.
+  # Special case for k < 3, since the code below assumes k >= 3.
   if k < 3:
     return [x for x in range(2**k) if (x * x - n) % 2**k == 0]
   s = InverseSqrt2exp(n, k)
   if s is None:
     return []
   r = Inverse2exp(s, k)
+  assert r is not None
   # Besides r there are three other roots modulo 2**k.
-  roots = [
-      r,
-      int(2**k - r),
-      gmpy.f_mod_2exp((2 ** (k - 1) - r), k),
-      gmpy.f_mod_2exp((2 ** (k - 1) + r), k),
-  ]
-  return roots
+  r2 = int(2**k - r)
+  assert r2 is not None
+  r3 = gmpy.f_mod_2exp((2 ** (k - 1) - r), k)
+  assert r3 is not None
+  r4 = gmpy.f_mod_2exp((2 ** (k - 1) + r), k)
+  assert r4 is not None
+  return [r, r2, r3, r4]
 
 
 def ContinuedFraction(a: int, b: int) -> list[tuple[int, int, int]]:
