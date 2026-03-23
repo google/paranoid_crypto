@@ -147,6 +147,9 @@ class EcCurve:
       if q != INFINITY:
         return False
     x, y = p
+    if x is None or y is None:  # INFINITY
+      return False
+
     if x < 0 or x > (self.mod - 1) or y < 0 or y > (self.mod - 1):
       return False
     return True
@@ -163,6 +166,8 @@ class EcCurve:
     if p == INFINITY:
       return p
     x, y = p
+    if y is None:
+      raise ValueError("y is None")
     return (x, -y % self.mod)
 
   def Double(self, p: EcPoint) -> EcPoint:
@@ -326,6 +331,10 @@ class EcCurve:
       return INFINITY_JACOBIAN
     else:
       x, y = p
+      if x is None:
+        raise ValueError("x is None")
+      if y is None:
+        raise ValueError("y is None")
       return (x, y, 1)
 
   def JacobianToAffine(self, p: EcPointJacobian) -> EcPoint:
@@ -678,7 +687,7 @@ class EcCurve:
       res[i] = self.AddJacobian(res[i - 1], base_jac)
     return self.BatchJacobianToAffine(res)
 
-  def PointTable(self, base: EcPoint, n: int) -> dict[int, int]:
+  def PointTable(self, base: EcPoint, n: int) -> dict[int | None, int]:
     """Returns a dict with {self.Multiply(base, i)[0]:i for i in range(n)}.
 
     Args:
