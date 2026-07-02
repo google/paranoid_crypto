@@ -130,11 +130,11 @@ class CheckWeakECPrivateKey(base_check.ECKeyCheck):
       if not keys:
         continue
       points = [ec_util.PublicPoint(key.ec_info) for key in keys]
-      discrete_logs = curve.ExtendedBatchDL(points)
+      discrete_logs = curve.ExtendedBatchDL(points)  # pyrefly: ignore[bad-argument-type]
       for i, key in enumerate(keys):
         test_result = self._CreateTestResult()
         if discrete_logs[i] is not None:
-          discrete_log = format(int(discrete_logs[i]), "x")
+          discrete_log = format(int(discrete_logs[i]), "x")  # pyrefly: ignore[bad-argument-type]
           logging.warning("Discrete logarithm found: %s %s", discrete_log,
                           key.ec_info)
           util.AttachInfo(key.test_info, consts.INFO_NAME_DISCRETE_LOG,

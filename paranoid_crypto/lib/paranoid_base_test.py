@@ -31,7 +31,7 @@ class ParanoidBaseTest(absltest.TestCase):
       composed = util.Bytes2Int(key.rsa_info.n) + delta
       factors = util.GetAttachedFactors(key.test_info, info_name)
       self.assertNotEmpty(factors)
-      for f in factors:
+      for f in factors:  # pyrefly: ignore[not-iterable]
         self.assertEqual(composed % f, 0)
 
   def assertResults(self, protos, check_name, weak):

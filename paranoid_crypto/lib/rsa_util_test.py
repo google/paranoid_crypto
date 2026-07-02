@@ -69,11 +69,11 @@ class RsaUtilTest(absltest.TestCase):
     # factor their product.
     max_steps = 2
     result = rsa_util.FermatFactor(p_fermat * q_fermat, max_steps)
-    self.assertEqual(result[0] * result[1], p_fermat * q_fermat)
+    self.assertEqual(result[0] * result[1], p_fermat * q_fermat)  # pyrefly: ignore[unsupported-operation]
     result = rsa_util.FermatFactor(2 * p_fermat, max_steps)
-    self.assertEqual(result[0] * result[1], 2 * p_fermat)
+    self.assertEqual(result[0] * result[1], 2 * p_fermat)  # pyrefly: ignore[unsupported-operation]
     result = rsa_util.FermatFactor(q_fermat * q_fermat, max_steps)
-    self.assertEqual(result[0] * result[1], q_fermat * q_fermat)
+    self.assertEqual(result[0] * result[1], q_fermat * q_fermat)  # pyrefly: ignore[unsupported-operation]
 
   def testPollardpm1(self):
     # Only p-1 is smooth enough:

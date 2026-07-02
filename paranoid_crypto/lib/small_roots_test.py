@@ -45,7 +45,7 @@ class SmallRootsTest(absltest.TestCase):
     p0 = (p >> unknown_bits) << unknown_bits
     f = sympy.Poly(p0 + x, modulus=n)
     rx = small_roots.univariate_modp(f, b)
-    self.assertEqual(p0 + rx, p)
+    self.assertEqual(p0 + rx, p)  # pyrefly: ignore[unsupported-operation]
 
     # With less known bits the factorization fails:
     unknown_bits = 480
@@ -58,7 +58,7 @@ class SmallRootsTest(absltest.TestCase):
     # By increasing the size of the lattice, we are still able to factor when up
     # to half of the bits are known:
     rx = small_roots.univariate_modp(f, b, k=9)
-    self.assertEqual(p0 + rx, p)
+    self.assertEqual(p0 + rx, p)  # pyrefly: ignore[unsupported-operation]
 
   def testUnivariateNegativeRoot(self):
     x = sympy.Symbol("x")
@@ -68,7 +68,7 @@ class SmallRootsTest(absltest.TestCase):
     p0 = p + rx
     f = sympy.Poly(p0 - x, modulus=n)
     rx = small_roots.univariate_modp(f, b)
-    self.assertEqual(p0 - rx, p)
+    self.assertEqual(p0 - rx, p)  # pyrefly: ignore[unsupported-operation]
 
   def testUnivariateLowBits(self):
     x = sympy.Symbol("x")
@@ -88,7 +88,7 @@ class SmallRootsTest(absltest.TestCase):
     p0 = p - rx**3
     f = sympy.Poly(p0 + x**3, modulus=n)
     rx = small_roots.univariate_modp(f, b)
-    self.assertEqual(p0 + rx**3, p)
+    self.assertEqual(p0 + rx**3, p)  # pyrefly: ignore[unsupported-operation]
 
   def testBivariateModp(self):
     x1, x2 = sympy.symbols("x1, x2")
@@ -204,7 +204,7 @@ class SmallRootsTest(absltest.TestCase):
     p0 = p - rx1**2
     q0 = n // p - rx2**3
     f = sympy.Poly((p0 + x1**2) * (q0 + x2**3), modulus=n)
-    rx1, rx2 = small_roots.multivariate_modn(f, [b1, b2])
+    rx1, rx2 = small_roots.multivariate_modn(f, [b1, b2])  # pyrefly: ignore[not-iterable]
     self.assertEqual((p0 + rx1**2) * (q0 + rx2**3), n)
 
 

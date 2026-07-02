@@ -119,7 +119,7 @@ class EcCurve:
       return True
     else:
       x, y = p
-      return 0 == ((x * x + self.a) * x + self.b - y * y) % self.mod
+      return 0 == ((x * x + self.a) * x + self.b - y * y) % self.mod  # pyrefly: ignore[unsupported-operation]
 
   def IsValidPublicKey(self, p: EcPoint) -> bool:
     """Checks whether p is a valid public key.
@@ -168,7 +168,7 @@ class EcCurve:
     x, y = p
     if y is None:
       raise ValueError("y is None")
-    return (x, -y % self.mod)
+    return (x, -y % self.mod)  # pyrefly: ignore[bad-return]
 
   def Double(self, p: EcPoint) -> EcPoint:
     """Doubles a point on a curve.
@@ -182,10 +182,10 @@ class EcCurve:
     if p == INFINITY:
       return p
     x, y = p
-    num = (3 * x * x + self.a) % self.mod
-    den = 2 * y
+    num = (3 * x * x + self.a) % self.mod  # pyrefly: ignore[unsupported-operation]
+    den = 2 * y  # pyrefly: ignore[unsupported-operation]
     t = num * gmpy.invert(den, self.mod) % self.mod
-    x2 = (t * t - 2 * x) % self.mod
+    x2 = (t * t - 2 * x) % self.mod  # pyrefly: ignore[unsupported-operation]
     y2 = (t * (x - x2) - y) % self.mod
     return (x2, y2)
 
@@ -210,8 +210,8 @@ class EcCurve:
         return self.Double(p)
       else:
         return INFINITY
-    inv = gmpy.invert(x1 - x2, self.mod)
-    t = (y1 - y2) * inv % self.mod
+    inv = gmpy.invert(x1 - x2, self.mod)  # pyrefly: ignore[unsupported-operation]
+    t = (y1 - y2) * inv % self.mod  # pyrefly: ignore[unsupported-operation]
     x3 = (t * t - x1 - x2) % self.mod
     y3 = (t * (x1 - x3) - y1) % self.mod
     return (x3, y3)
@@ -410,7 +410,7 @@ class EcCurve:
       if w is not None:
         wsqr = w * w % mod
         res[i] = p[0] * wsqr % mod
-    return res
+    return res  # pyrefly: ignore[bad-return]
 
   def BatchJacobianToAffine(
       self, p_list: list[EcPointJacobian]
@@ -436,7 +436,7 @@ class EcCurve:
         wcube = wsqr * w % mod
         y = p[1] * wcube % mod
         res[i] = (x, y)
-    return res
+    return res  # pyrefly: ignore[bad-return]
 
   def BatchInverse(self, values: list[Coordinate]) -> list[Coordinate]:
     """Computes the inverse of all integers in a list.
@@ -458,7 +458,7 @@ class EcCurve:
     product = 1
     for i, v in enumerate(values):
       if v:
-        res[i] = product
+        res[i] = product  # pyrefly: ignore[unsupported-operation]
         product = product * v % mod
     inverse = gmpy.invert(product, mod)
     for i in range(len(values) - 1, -1, -1):
@@ -469,7 +469,7 @@ class EcCurve:
     # a simple self check
     if inverse != 1:
       raise ArithmeticError("failed invariant")
-    return res
+    return res  # pyrefly: ignore[bad-return]
 
   def BatchAddList(
       self, p_list: list[EcPoint], q_list: list[EcPoint]
@@ -495,20 +495,20 @@ class EcCurve:
       p = p_list[i]
       q = q_list[i]
       if p != INFINITY and q != INFINITY:
-        tmp[i] = (p[0] - q[0]) % self.mod
-    tmp = self.BatchInverse(tmp)
+        tmp[i] = (p[0] - q[0]) % self.mod  # pyrefly: ignore[unsupported-operation]
+    tmp = self.BatchInverse(tmp)  # pyrefly: ignore[bad-argument-type]
     res = [(None, None)] * size
     for i, v in enumerate(tmp):
       if v is None:
-        res[i] = self.Add(p_list[i], q_list[i])
+        res[i] = self.Add(p_list[i], q_list[i])  # pyrefly: ignore[unsupported-operation]
       else:
         p = p_list[i]
         q = q_list[i]
-        t = v * (p[1] - q[1]) % self.mod
+        t = v * (p[1] - q[1]) % self.mod  # pyrefly: ignore[unsupported-operation]
         x = (t * t - p[0] - q[0]) % self.mod
         y = (t * (p[0] - x) - p[1]) % self.mod
         res[i] = (x, y)
-    return res
+    return res  # pyrefly: ignore[bad-return]
 
   def BatchDouble(self, p_list: list[EcPoint]) -> list[EcPoint]:
     """Doubles all points in a list.
@@ -523,20 +523,20 @@ class EcCurve:
     tmp = [None] * size
     for i, p in enumerate(p_list):
       if p != INFINITY:
-        tmp[i] = 2 * p[1]
-    tmp = self.BatchInverse(tmp)
+        tmp[i] = 2 * p[1]  # pyrefly: ignore[unsupported-operation]
+    tmp = self.BatchInverse(tmp)  # pyrefly: ignore[bad-argument-type]
     res = [(None, None)] * size
     for i, p in enumerate(p_list):
       if tmp[i] is None:
-        res[i] = self.Double(p)
+        res[i] = self.Double(p)  # pyrefly: ignore[unsupported-operation]
       else:
         x, y = p
-        num = (3 * x * x + self.a) % self.mod
+        num = (3 * x * x + self.a) % self.mod  # pyrefly: ignore[unsupported-operation]
         t = num * tmp[i] % self.mod
-        x2 = (t * t - 2 * x) % self.mod
+        x2 = (t * t - 2 * x) % self.mod  # pyrefly: ignore[unsupported-operation]
         y2 = (t * (x - x2) - y) % self.mod
         res[i] = (x2, y2)
-    return res
+    return res  # pyrefly: ignore[bad-return]
 
   def BatchAdd(self, p: EcPoint, points: list[EcPoint]) -> list[EcPoint]:
     """Computes the addition of a point and a list of points.
@@ -553,18 +553,18 @@ class EcCurve:
     tmp = [None] * len(points)
     for i, q in enumerate(points):
       if q != INFINITY:
-        tmp[i] = (p[0] - q[0]) % self.mod
-    tmp = self.BatchInverse(tmp)
+        tmp[i] = (p[0] - q[0]) % self.mod  # pyrefly: ignore[unsupported-operation]
+    tmp = self.BatchInverse(tmp)  # pyrefly: ignore[bad-argument-type]
     res = [(None, None)] * len(points)
     for i, v in enumerate(tmp):
       if v:
-        t = v * (p[1] - points[i][1]) % self.mod
+        t = v * (p[1] - points[i][1]) % self.mod  # pyrefly: ignore[unsupported-operation]
         x = (t * t - p[0] - points[i][0]) % self.mod
         y = (t * (p[0] - x) - p[1]) % self.mod
         res[i] = (x, y)
       else:
-        res[i] = self.Add(p, points[i])
-    return res
+        res[i] = self.Add(p, points[i])  # pyrefly: ignore[unsupported-operation]
+    return res  # pyrefly: ignore[bad-return]
 
   def BatchAddX(self, p: EcPoint, points: list[EcPoint]) -> list[Coordinate]:
     """Computes the X-coordinate of the sum of a point and a list of points.
@@ -581,11 +581,11 @@ class EcCurve:
     tmp = [None] * len(points)
     for i, q in enumerate(points):
       if q != INFINITY:
-        tmp[i] = (p[0] - q[0]) % self.mod
-    tmp = self.BatchInverse(tmp)
+        tmp[i] = (p[0] - q[0]) % self.mod  # pyrefly: ignore[unsupported-operation]
+    tmp = self.BatchInverse(tmp)  # pyrefly: ignore[bad-argument-type]
     for i, v in enumerate(tmp):
       if v:
-        t = v * (p[1] - points[i][1]) % self.mod
+        t = v * (p[1] - points[i][1]) % self.mod  # pyrefly: ignore[unsupported-operation]
         x = (t * t - p[0] - points[i][0]) % self.mod
         tmp[i] = x
       else:
@@ -617,21 +617,21 @@ class EcCurve:
     tmp = [None] * len(points)
     for i, q in enumerate(points):
       if q != INFINITY:
-        tmp[i] = (p[0] - q[0]) % self.mod
-    tmp = self.BatchInverse(tmp)
+        tmp[i] = (p[0] - q[0]) % self.mod  # pyrefly: ignore[unsupported-operation]
+    tmp = self.BatchInverse(tmp)  # pyrefly: ignore[bad-argument-type]
     sums = [None] * len(points)
     diffs = [None] * len(points)
     for i, v in enumerate(tmp):
       q = points[i]
       if v:
-        t = v * (p[1] - q[1]) % self.mod
+        t = v * (p[1] - q[1]) % self.mod  # pyrefly: ignore[unsupported-operation]
         sums[i] = (t * t - p[0] - q[0]) % self.mod
-        t = v * (p[1] + q[1]) % self.mod
+        t = v * (p[1] + q[1]) % self.mod  # pyrefly: ignore[unsupported-operation]
         diffs[i] = (t * t - p[0] - q[0]) % self.mod
       else:
-        sums[i] = self.Add(p, q)[0]
-        diffs[i] = self.Subtract(p, q)[0]
-    return sums, diffs
+        sums[i] = self.Add(p, q)[0]  # pyrefly: ignore[unsupported-operation]
+        diffs[i] = self.Subtract(p, q)[0]  # pyrefly: ignore[unsupported-operation]
+    return sums, diffs  # pyrefly: ignore[bad-return]
 
   def BatchMultiplyG(self, scalars: list[int]) -> list[EcPoint]:
     """Multiplies the generator of this curve by a list of integers.
@@ -666,9 +666,9 @@ class EcCurve:
       if i == steps - 1:
         res = points
       else:
-        res = self.BatchDouble(res)
-        res = self.BatchAddList(res, points)
-    return res
+        res = self.BatchDouble(res)  # pyrefly: ignore[bad-argument-type, unbound-name]
+        res = self.BatchAddList(res, points)  # pyrefly: ignore[bad-argument-type]
+    return res  # pyrefly: ignore[bad-return, unbound-name]
 
   def PointSequence(self, base: EcPoint, n: int) -> list[Optional[EcPoint]]:
     """Returns [self.Multiply(base, i) for i in range(n)].
@@ -682,10 +682,10 @@ class EcCurve:
     """
     base_jac = self.AffineToJacobian(base)
     res = [None] * n
-    res[0] = INFINITY_JACOBIAN
+    res[0] = INFINITY_JACOBIAN  # pyrefly: ignore[unsupported-operation]
     for i in range(1, n):
-      res[i] = self.AddJacobian(res[i - 1], base_jac)
-    return self.BatchJacobianToAffine(res)
+      res[i] = self.AddJacobian(res[i - 1], base_jac)  # pyrefly: ignore[bad-argument-type, unsupported-operation]
+    return self.BatchJacobianToAffine(res)  # pyrefly: ignore[bad-argument-type, bad-return]
 
   def PointTable(self, base: EcPoint, n: int) -> dict[int | None, int]:
     """Returns a dict with {self.Multiply(base, i)[0]:i for i in range(n)}.
@@ -712,7 +712,7 @@ class EcCurve:
     res = {}
     for i, p in enumerate(sequence_high):
       im = i * m
-      for j, x in enumerate(self.BatchAddX(p, sequence_low)):
+      for j, x in enumerate(self.BatchAddX(p, sequence_low)):  # pyrefly: ignore[bad-argument-type]
         res[x] = im + j
     return res
 
@@ -752,18 +752,18 @@ class EcCurve:
     res = [None] * len(points)
     for i, p in enumerate(points):
       if p == INFINITY:
-        res[i] = 0
+        res[i] = 0  # pyrefly: ignore[unsupported-operation]
         continue
-      for j, x in enumerate(self.BatchAddX(p, list_c)):
+      for j, x in enumerate(self.BatchAddX(p, list_c)):  # pyrefly: ignore[bad-argument-type]
         if x in self._table:
           for dl in [j * t + self._table[x], j * t - self._table[x]]:
             y = self.Multiply(base, dl)
             if y[0] == p[0]:
               if y[1] == p[1]:
                 res[i] = dl
-              elif y[1] == -p[1] % self.mod:
+              elif y[1] == -p[1] % self.mod:  # pyrefly: ignore[unsupported-operation]
                 res[i] = -dl
-    return res
+    return res  # pyrefly: ignore[bad-return]
 
   def ExtendedBatchDL(self, points: list[EcPoint]) -> list[Optional[int]]:
     """Finds the DLs of points assuming the DLs have a special form.
@@ -813,13 +813,13 @@ class EcCurve:
     all_points = [None] * (len(multipliers) * num_points)
     for j, inverse in enumerate(inverses):
       for i, point in enumerate(points):
-        all_points[i + num_points * j] = self.Multiply(point, inverse)
-    discrete_logs = self.BatchDL(all_points, 2**32)
+        all_points[i + num_points * j] = self.Multiply(point, inverse)  # pyrefly: ignore[unsupported-operation]
+    discrete_logs = self.BatchDL(all_points, 2**32)  # pyrefly: ignore[bad-argument-type]
     res = [None] * num_points
     for k, dlog in enumerate(discrete_logs):
       if dlog is not None:
-        res[k % num_points] = int(dlog * multipliers[k // num_points])
-    return res
+        res[k % num_points] = int(dlog * multipliers[k // num_points])  # pyrefly: ignore[unsupported-operation]
+    return res  # pyrefly: ignore[bad-return]
 
   def BatchDLOfDifferences(
       self,
@@ -854,7 +854,7 @@ class EcCurve:
     res = [None] * len(points)
     # Avoids to generate a table when there is nothing to test.
     if not points or len(points) + len(other_points) < 2:
-      return res
+      return res  # pyrefly: ignore[bad-return]
     base = self.g
     if max_diff > self._table_size:
       # TODO(pedroysb): An improvement would be to generate from
@@ -872,12 +872,12 @@ class EcCurve:
           for dl in (self._table[x], -self._table[x]):
             diff2 = self.Multiply(base, dl)
             if diff == diff2:
-              res[i] = "key - (%x, %x) = %d * G" % (q[0], q[1], dl)
+              res[i] = "key - (%x, %x) = %d * G" % (q[0], q[1], dl)  # pyrefly: ignore[unsupported-operation]
               if j >= len(other_points):
                 key2 = j - len(other_points)
-                res[key2] = "key - (%x, %x) = %d * G" % (p[0], p[1], -dl)
+                res[key2] = "key - (%x, %x) = %d * G" % (p[0], p[1], -dl)  # pyrefly: ignore[unsupported-operation]
       negated.append(self.Negate(p))
-    return res
+    return res  # pyrefly: ignore[bad-return]
 
   def TransformOrderLen(self, h: int, hlen: int) -> int:
     """Makes h fit the curve order bit length (rfc6979 section-2.4)."""

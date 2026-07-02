@@ -99,7 +99,7 @@ class BiasedBaseCheck(base_check.ECDSASignatureCheck):
         a, b = [None] * len(unique_vals), [None] * len(unique_vals)
         for i in range(len(unique_vals)):
           r, s, z = unique_vals[i]
-          a[i], b[i] = curve.HiddenNumberParams(r, s, z)
+          a[i], b[i] = curve.HiddenNumberParams(r, s, z)  # pyrefly: ignore[unsupported-operation]
         if self.bias:
           # For general biases it makes sense to check with different sizes for
           # the sets of signatures. E.g., 24 to catch simple LCGs, 48 to catch
@@ -110,14 +110,14 @@ class BiasedBaseCheck(base_check.ECDSASignatureCheck):
           for size in (24, 48, 120):
             for i in range(0, len(a), size):
               guesses.update(
-                  hnp.HiddenNumberProblem(a[i:i + size], b[i:i + size], None,
+                  hnp.HiddenNumberProblem(a[i:i + size], b[i:i + size], None,  # pyrefly: ignore[bad-argument-type]
                                           curve.n, self.bias))
             if len(a) <= size:
               # Tests with a larger window are not leading to additional tests.
               break
         elif self.lcg_params:
           guesses.update(
-              hnp.HiddenNumberProblemForCurve(a, b, curve_id,
+              hnp.HiddenNumberProblemForCurve(a, b, curve_id,  # pyrefly: ignore[bad-argument-type]
                                               self.lcg_params[0],
                                               self.lcg_params[1]))
       issuer_dlogs = _IssuerDLogs(list(guesses), pks, curve)
@@ -227,7 +227,7 @@ class CheckIssuerKey(base_check.ECDSASignatureCheck):
         logging.warning("Weak issuer public key: %s", key)
         any_weak = True
         test_result.result = True
-        test_result.severity = util.GetHighestSeverity(key.test_info)
+        test_result.severity = util.GetHighestSeverity(key.test_info)  # pyrefly: ignore[bad-assignment]
       for i in points[ec_util.PublicPoint(key.ec_info)]:
         util.SetTestResult(artifacts[i].test_info, test_result)
     return any_weak

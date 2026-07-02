@@ -24,7 +24,7 @@ class NTheoryUtilTest(absltest.TestCase):
     for i in range(1, 257):
       x = random.getrandbits(i) | 1
       a = ntheory_util.Inverse2exp(x, i)
-      self.assertEqual(a * x % 2**i, 1)
+      self.assertEqual(a * x % 2**i, 1)  # pyrefly: ignore[unsupported-operation]
 
   def testInverseSqrt2exp(self):
     for i in range(1, 257):
@@ -33,7 +33,7 @@ class NTheoryUtilTest(absltest.TestCase):
       x -= x % 8
       x += 1
       a = ntheory_util.InverseSqrt2exp(x, i)
-      self.assertEqual(a * a * x % 2**i, 1)
+      self.assertEqual(a * a * x % 2**i, 1)  # pyrefly: ignore[unsupported-operation]
 
   def testSqrt2exp(self):
     for i in range(1, 257):

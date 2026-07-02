@@ -253,19 +253,19 @@ def LongestRuns(bits: int, n: int) -> float:
                 [0.0882, 0.2092, 0.2483, 0.1933, 0.1208, 0.0675, 0.0727]
             ]]
   for p in params[::-1]:
-    if n >= p[0]:
+    if n >= p[0]:  # pyrefly: ignore[unsupported-operation]
       _, m, v_lower, v_upper, pi = p
-      k = v_upper - v_lower
+      k = v_upper - v_lower  # pyrefly: ignore[unsupported-operation]
       break
   else:
     raise InsufficientDataError("The test requires at least 128 bits of data")
-  blocks = util.SplitSequence(bits, n, m)
+  blocks = util.SplitSequence(bits, n, m)  # pyrefly: ignore[bad-argument-type]
   longest_runs = [util.LongestRunOfOnes(block) for block in blocks]
-  v = [0] * (v_upper - v_lower + 1)
+  v = [0] * (v_upper - v_lower + 1)  # pyrefly: ignore[unsupported-operation]
   for x in longest_runs:
-    idx = max(0, min(v_upper, x) - v_lower)
+    idx = max(0, min(v_upper, x) - v_lower)  # pyrefly: ignore[unsupported-operation]
     v[idx] += 1
-  p_value = ChiSquare(v, pi, k)
+  p_value = ChiSquare(v, pi, k)  # pyrefly: ignore[bad-argument-type]
   return p_value
 
 
@@ -298,13 +298,13 @@ def RankDistribution(r: int,
       ]
       return precomputed[:k] + [sum(precomputed[k:])]
   res = [0] * (r + 1)
-  res[0] = 1.0
+  res[0] = 1.0  # pyrefly: ignore[unsupported-operation]
   for _ in range(c):
     for j in range(r - 1, -1, -1):
       prob_dependent = 2**(j - r)
       res[j + 1] += res[j] * (1 - prob_dependent)
       res[j] *= prob_dependent
-  return res[-k:][::-1] + [sum(res[:-k])]
+  return res[-k:][::-1] + [sum(res[:-k])]  # pyrefly: ignore[bad-return]
 
 
 def BinaryMatrixRankImpl(rows: list[int], r: int, c: int, k: int) -> float:
@@ -397,8 +397,8 @@ def Spectral(bits: int, n: int) -> float:
   #   instead of fft. Single precision floating point could be
   #   sufficient. Truncating bits to a multiple of a power of two
   #   might allow a faster FFT.
-  bits = list(util.Bits(bits, n))
-  m = util.Dft(bits)
+  bits = list(util.Bits(bits, n))  # pyrefly: ignore[bad-assignment]
+  m = util.Dft(bits)  # pyrefly: ignore[bad-argument-type]
   m = m[:n // 2]
   # The bound t was proposed in Section 3 of the paper
   # https://eprint.iacr.org/2004/018.pdf.
@@ -535,8 +535,8 @@ def NonOverlappingTemplateMatching(
     for b in range(2**m):
       if IsNonOverlappingTemplate(b, m):
         templates.append(b)
-  blocks = util.SplitSequence(bits, n, block_size)
-  return NonOverlappingTemplateMatchingImpl(blocks, block_size, m, templates)
+  blocks = util.SplitSequence(bits, n, block_size)  # pyrefly: ignore[bad-assignment]
+  return NonOverlappingTemplateMatchingImpl(blocks, block_size, m, templates)  # pyrefly: ignore[bad-argument-type]
 
 
 def OverlappingTemplateMatchingMatrix(m: int, k: int) -> list[list[float]]:
@@ -565,16 +565,16 @@ def OverlappingTemplateMatchingMatrix(m: int, k: int) -> list[list[float]]:
     for run in range(m):
       i = occurrences * m + run
       # Getting a 0
-      mat[i][occurrences * m] += 0.5
+      mat[i][occurrences * m] += 0.5  # pyrefly: ignore[unsupported-operation]
       # Getting a 1
       if run < m - 1:
-        mat[i][i + 1] += 0.5
+        mat[i][i + 1] += 0.5  # pyrefly: ignore[unsupported-operation]
       elif occurrences < k - 1:
-        mat[i][i + m] += 0.5
+        mat[i][i + m] += 0.5  # pyrefly: ignore[unsupported-operation]
       else:
-        mat[i][k * m] += 0.5
-  mat[k * m][k * m] = 1.0
-  return mat
+        mat[i][k * m] += 0.5  # pyrefly: ignore[unsupported-operation]
+  mat[k * m][k * m] = 1.0  # pyrefly: ignore[unsupported-operation]
+  return mat  # pyrefly: ignore[bad-return]
 
 
 def OverlappingTemplateMatchingDistribution(n: int, m: int,
@@ -596,7 +596,7 @@ def OverlappingTemplateMatchingDistribution(n: int, m: int,
   matn = numpy.linalg.matrix_power(mat, n)
   row_0 = matn[0]
   pi = [sum(row_0[i * m:(i + 1) * m]) for i in range(k + 1)]
-  return pi
+  return pi  # pyrefly: ignore[bad-return]
 
 
 def OverlappingTemplateMatchingImpl(blocks: list[int], n: int, m: int) -> float:
@@ -1071,11 +1071,11 @@ def RandomExcursionsDistribution(x: int, max_cnt: int = 5) -> list[float]:
   """
   pi = [0] * (max_cnt + 1)
   t = 1 / (2 * abs(x))
-  pi[0] = 1 - t
+  pi[0] = 1 - t  # pyrefly: ignore[unsupported-operation]
   for k in range(1, max_cnt):
-    pi[k] = t**2 * (1 - t)**(k - 1)
-  pi[max_cnt] = t * (1 - t)**(max_cnt - 1)
-  return pi
+    pi[k] = t**2 * (1 - t)**(k - 1)  # pyrefly: ignore[unsupported-operation]
+  pi[max_cnt] = t * (1 - t)**(max_cnt - 1)  # pyrefly: ignore[unsupported-operation]
+  return pi  # pyrefly: ignore[bad-return]
 
 
 def RandomWalk(bits: int,

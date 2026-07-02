@@ -122,12 +122,12 @@ class EcUtilTest(parameterized.TestCase):
       c: an EC group. The test uses its modulus.
     """
     values = list(range(-100, 100))
-    inverses = c.BatchInverse(values)
+    inverses = c.BatchInverse(values)  # pyrefly: ignore[bad-argument-type]
     for v, inv in zip(values, inverses):
       if v == 0:
         self.assertIs(inv, None)
       else:
-        self.assertEqual(v * inv % c.mod, 1)
+        self.assertEqual(v * inv % c.mod, 1)  # pyrefly: ignore[unsupported-operation]
 
   @parameterized.named_parameters(*curves)
   def testBatchAdd(self, c: ec_util.EcCurve):

@@ -48,7 +48,7 @@ class CheckECKeySmallDifference(base_check.ECKeyCheck):
       # individually.
       keys = [key for key in artifacts if key.ec_info.curve_type == curve_id]
       points = [ec_util.PublicPoint(key.ec_info) for key in keys]
-      result = curve.BatchDLOfDifferences(points, max_diff=self._max_diff)
+      result = curve.BatchDLOfDifferences(points, max_diff=self._max_diff)  # pyrefly: ignore[bad-argument-type]
       for i, key in enumerate(keys):
         test_result = self._CreateTestResult()
         if result[i] is not None:
@@ -56,7 +56,7 @@ class CheckECKeySmallDifference(base_check.ECKeyCheck):
               "Keys with small difference found: %s %s", result[i], key.ec_info
           )
           util.AttachInfo(
-              key.test_info, consts.INFO_NAME_DISCRETE_LOG_DIFF, result[i]
+              key.test_info, consts.INFO_NAME_DISCRETE_LOG_DIFF, result[i]  # pyrefly: ignore[bad-argument-type]
           )
           any_weak = True
           test_result.result = True

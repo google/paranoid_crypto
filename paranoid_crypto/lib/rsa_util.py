@@ -52,9 +52,9 @@ def BatchGCD(
     remainders = [None] * len(unique_values)
     for i in range(len(unique_values)):
       if i + 1 == len(unique_values) and i % 2 == 0:
-        remainders[i] = prev[i // 2]
+        remainders[i] = prev[i // 2]  # pyrefly: ignore[unsupported-operation]
       else:
-        remainders[i] = prev[i // 2] % unique_values[i]
+        remainders[i] = prev[i // 2] % unique_values[i]  # pyrefly: ignore[unsupported-operation]
   gcds_dict = {v: gmpy.gcd(v, r) for v, r in zip(unique_values, remainders)}
   return [gcds_dict[v] for v in values]
 
@@ -165,7 +165,7 @@ def FactorHighAndLowBitsEqual(
     return None
   # Computes a square root r0 modulo 2**k
   k = (n.bit_length() + 1) // 2
-  r0 = ntheory_util.Inverse2exp(ntheory_util.InverseSqrt2exp(n, k + 1), k + 1)
+  r0 = ntheory_util.Inverse2exp(ntheory_util.InverseSqrt2exp(n, k + 1), k + 1)  # pyrefly: ignore[bad-argument-type]
   # Fighting with broken lint rules here and below.
   if r0 is None:
     raise ArithmeticError("expecting that square root exists")
@@ -467,7 +467,7 @@ def Pollardpm1(
   # p = b*m + 1 and q = c*m + 1, and where either b or c is smooth.
   if gmpy.gcd(n - 1, m) >= gcd_bound:
     a = pow(2, n - 1, n)
-    p = gmpy.gcd(pow(a, m, n) - 1, n)
+    p = gmpy.gcd(pow(a, m, n) - 1, n)  # pyrefly: ignore[no-matching-overload]
     if 1 < p < n:
       return True, [p, n // p]
     if p == n:

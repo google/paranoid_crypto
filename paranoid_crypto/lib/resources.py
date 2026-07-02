@@ -67,6 +67,6 @@ def GetParanoidResource(path: str) -> bytes:
     IOError: If the resource cannot be loaded.
   """
   with GetParanoidResourceAsFile(path, 'rb') as resource_file:
-    return resource_file.read()
+    return resource_file.read()  # pyrefly: ignore[bad-return]
 
 

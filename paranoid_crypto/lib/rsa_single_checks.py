@@ -142,7 +142,7 @@ class CheckFermat(base_check.RSAKeyCheck):
     for key in artifacts:
       test_result = self._CreateTestResult()
       n = gmpy.mpz(util.Bytes2Int(key.rsa_info.n))
-      factors = rsa_util.FermatFactor(n, self._max_steps)
+      factors = rsa_util.FermatFactor(n, self._max_steps)  # pyrefly: ignore[bad-argument-type]
       if factors:
         logging.warning("Key factored! Factors: %s\n%s", factors, key.rsa_info)
         util.AttachFactors(key.test_info, consts.INFO_NAME_N_FACTORS, factors)
@@ -233,7 +233,7 @@ class CheckContinuedFractions(base_check.RSAKeyCheck):
     for key in artifacts:
       test_result = self._CreateTestResult()
       n = gmpy.mpz(util.Bytes2Int(key.rsa_info.n))
-      ok, factors = rsa_util.CheckContinuedFraction(n, self._bound)
+      ok, factors = rsa_util.CheckContinuedFraction(n, self._bound)  # pyrefly: ignore[bad-argument-type]
       if not ok:
         if factors:
           logging.warning(
@@ -582,7 +582,7 @@ class CheckKeypairDenylist(base_check.RSAKeyCheck):
         seed = bytearray([metadata[0]] + [0] * 31)
         for i in range(1, len(metadata), 2):
           seed[metadata[i]] = metadata[i + 1]
-        p, q = keypair_generator.Generator(seed).generate_key(n.bit_length())
+        p, q = keypair_generator.Generator(seed).generate_key(n.bit_length())  # pyrefly: ignore[bad-argument-type]
         if p * q == n:
           logging.warning("Key factored! Factors: %s\n%s", (p, q), key.rsa_info)
           util.AttachFactors(key.test_info, consts.INFO_NAME_N_FACTORS, (p, q))

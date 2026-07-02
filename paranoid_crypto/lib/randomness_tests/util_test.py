@@ -361,7 +361,7 @@ class UtilTest(absltest.TestCase):
     expected = [
         0.0, 2.0, 4.472136, 2.0, 4.472136, 2.0, 4.472136, 2.0, 4.472136, 2.0
     ]
-    v = util.Dft(x)
+    v = util.Dft(x)  # pyrefly: ignore[bad-argument-type]
     self.assertSequenceAlmostEqual(expected, v, delta=1e-6)
 
 
