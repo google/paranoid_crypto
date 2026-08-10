@@ -14,6 +14,7 @@
 
 #include "paranoid_crypto/lib/randomness_tests/cc_util/berlekamp_massey.h"
 
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -66,7 +67,7 @@ static struct TestVector {
 };
 
 TEST(BerlekampMassey, Tv) {
-  for (int i = 0; i < arraysize(test_vector); i++) {
+  for (int i = 0; i < std::size(test_vector); i++) {
     std::vector<uint8_t> seq((test_vector[i].size + 7) / 8);
     for (int j = 0; j < seq.size(); j++) {
       seq[j] = (test_vector[i].s >> (8 * j)) & 255;
