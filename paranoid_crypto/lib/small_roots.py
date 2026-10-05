@@ -26,8 +26,8 @@ def _get_monomials(f: sympy.Poly) -> list[sympy.Poly]:
   for exps in f.monoms():
     mon = 1
     for i in range(len(exps)):
-      mon *= f.gens[i] ** exps[i]  # pyrefly: ignore[missing-attribute]
-    mons.append(sympy.Poly(mon, *f.gens))  # pyrefly: ignore[missing-attribute]
+      mon *= f.gens[i] ** exps[i]
+    mons.append(sympy.Poly(mon, *f.gens))
   return mons
 
 

@@ -310,7 +310,7 @@ def TestSource(source: Source,
 
   if not tests:
     logging.info("no tests specified")
-    return  # pytype: disable=bad-return-type
+    return  # pyrefly: ignore[bad-return]
 
   undecided = len(tests)
   while undecided:
