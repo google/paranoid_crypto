@@ -19,7 +19,6 @@ if partial information about the prime numbers is known.
 
 from typing import Optional
 import gmpy2 as gmpy
-from paranoid_crypto.lib import ntheory_util
 
 
 def FactorWithGuess(n: int, p_0: int) -> Optional[list[int]]:
@@ -62,6 +61,8 @@ def FactorWithGuess(n: int, p_0: int) -> Optional[list[int]]:
   Returns:
     A factorization [p, q] of n or None if no factor could be found.
   """
+  n = gmpy.mpz(n)
+  p_0 = gmpy.mpz(p_0)
   q_0 = n // p_0
 
   # Finds an approximation bound = n ** (1 / 3)
@@ -71,9 +72,17 @@ def FactorWithGuess(n: int, p_0: int) -> Optional[list[int]]:
   shift = max(0, (bits // 3) - 52)
   bound = int((int(n) >> (3 * shift)) ** (1 / 3)) << shift
 
-  for _, u, v in ntheory_util.ContinuedFraction(p_0, q_0):
+  a, b = p_0, q_0
+  u0, u1 = gmpy.mpz(0), gmpy.mpz(1)
+  v0, v1 = gmpy.mpz(1), gmpy.mpz(0)
+  while b:
+    quot, rem = divmod(a, b)
+    a, b = b, rem
+    u0, u1 = u1, quot * u1 + u0
+    v0, v1 = v1, quot * v1 + v0
     # An approximation u / v of p_0 / q_0 is good enough for this factoring
-    # method abs(u * q_0 - v * p_0) < bound.
+    # method when abs(u * q_0 - v * p_0) < bound. By the continued fraction
+    # identity, abs(u1 * q_0 - v1 * p_0) == rem.
     # Lehman proves that such a pair (u, v) exists with u * v <= n^(1/3).
     # The main idea is that in this case u * q is close to v * p.
     # Therefore, applying Fermat's method to 4 * u * v * n = (2 * u * q) *
@@ -81,14 +90,14 @@ def FactorWithGuess(n: int, p_0: int) -> Optional[list[int]]:
     # Multiplying by 4 is done, because u*q or v*p can be even. Fermat's
     # method does not work if one of the factors is even and the other one is
     # odd.
-    if abs(u * q_0 - v * p_0) < bound:
-      d = 4 * u * v * n
-      a = gmpy.isqrt(d)
-      if a * a < d:
-        a += 1
-      if gmpy.is_square(a * a - d):
-        b = gmpy.isqrt(a * a - d)
-        g = gmpy.gcd(a + b, n)
+    if rem < bound:
+      d = 4 * u1 * v1 * n
+      s = gmpy.isqrt(d)
+      if s * s < d:
+        s += 1
+      if gmpy.is_square(s * s - d):
+        t = gmpy.isqrt(s * s - d)
+        g = gmpy.gcd(s + t, n)
         if 1 < g < n:
           return [g, n // g]
       return None
