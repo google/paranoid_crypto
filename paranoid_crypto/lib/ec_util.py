@@ -550,17 +550,20 @@ class EcCurve:
     """
     if p == INFINITY:
       return points[:]
+    mod = self.mod
+    px, py = p
     tmp = [None] * len(points)
     for i, q in enumerate(points):
       if q != INFINITY:
-        tmp[i] = (p[0] - q[0]) % self.mod  # pyrefly: ignore[unsupported-operation]
+        tmp[i] = (px - q[0]) % mod  # pyrefly: ignore[unsupported-operation]
     tmp = self.BatchInverse(tmp)  # pyrefly: ignore[bad-argument-type]
     res = [(None, None)] * len(points)
     for i, v in enumerate(tmp):
       if v:
-        t = v * (p[1] - points[i][1]) % self.mod  # pyrefly: ignore[unsupported-operation]
-        x = (t * t - p[0] - points[i][0]) % self.mod
-        y = (t * (p[0] - x) - p[1]) % self.mod
+        q = points[i]
+        t = v * (py - q[1]) % mod  # pyrefly: ignore[unsupported-operation]
+        x = (t * t - px - q[0]) % mod
+        y = (t * (px - x) - py) % mod
         res[i] = (x, y)
       else:
         res[i] = self.Add(p, points[i])  # pyrefly: ignore[unsupported-operation]
@@ -578,16 +581,18 @@ class EcCurve:
     """
     if p == INFINITY:
       return [q[0] for q in points]
+    mod = self.mod
+    px, py = p
     tmp = [None] * len(points)
     for i, q in enumerate(points):
       if q != INFINITY:
-        tmp[i] = (p[0] - q[0]) % self.mod  # pyrefly: ignore[unsupported-operation]
+        tmp[i] = (px - q[0]) % mod  # pyrefly: ignore[unsupported-operation]
     tmp = self.BatchInverse(tmp)  # pyrefly: ignore[bad-argument-type]
     for i, v in enumerate(tmp):
       if v:
-        t = v * (p[1] - points[i][1]) % self.mod  # pyrefly: ignore[unsupported-operation]
-        x = (t * t - p[0] - points[i][0]) % self.mod
-        tmp[i] = x
+        q = points[i]
+        t = v * (py - q[1]) % mod  # pyrefly: ignore[unsupported-operation]
+        tmp[i] = (t * t - px - q[0]) % mod
       else:
         tmp[i] = self.Add(p, points[i])[0]
     return tmp
@@ -614,20 +619,23 @@ class EcCurve:
     """
     if p == INFINITY:
       return [q[0] for q in points], [q[0] for q in points]
+    mod = self.mod
+    px, py = p
     tmp = [None] * len(points)
     for i, q in enumerate(points):
       if q != INFINITY:
-        tmp[i] = (p[0] - q[0]) % self.mod  # pyrefly: ignore[unsupported-operation]
+        tmp[i] = (px - q[0]) % mod  # pyrefly: ignore[unsupported-operation]
     tmp = self.BatchInverse(tmp)  # pyrefly: ignore[bad-argument-type]
     sums = [None] * len(points)
     diffs = [None] * len(points)
     for i, v in enumerate(tmp):
       q = points[i]
       if v:
-        t = v * (p[1] - q[1]) % self.mod  # pyrefly: ignore[unsupported-operation]
-        sums[i] = (t * t - p[0] - q[0]) % self.mod
-        t = v * (p[1] + q[1]) % self.mod  # pyrefly: ignore[unsupported-operation]
-        diffs[i] = (t * t - p[0] - q[0]) % self.mod
+        sx = px + q[0]  # pyrefly: ignore[unsupported-operation]
+        t = v * (py - q[1]) % mod  # pyrefly: ignore[unsupported-operation]
+        sums[i] = (t * t - sx) % mod
+        t = v * (py + q[1]) % mod  # pyrefly: ignore[unsupported-operation]
+        diffs[i] = (t * t - sx) % mod
       else:
         sums[i] = self.Add(p, q)[0]  # pyrefly: ignore[unsupported-operation]
         diffs[i] = self.Subtract(p, q)[0]  # pyrefly: ignore[unsupported-operation]
@@ -687,33 +695,54 @@ class EcCurve:
       res[i] = self.AddJacobian(res[i - 1], base_jac)  # pyrefly: ignore[bad-argument-type, unsupported-operation]
     return self.BatchJacobianToAffine(res)  # pyrefly: ignore[bad-argument-type, bad-return]
 
-  def PointTable(self, base: EcPoint, n: int) -> dict[int | None, int]:
-    """Returns a dict with {self.Multiply(base, i)[0]:i for i in range(n)}.
+  def PointTable(
+      self,
+      base: EcPoint,
+      n: int,
+      start: int = 0,
+      out: Optional[dict[int | None, int]] = None,
+  ) -> dict[int | None, int]:
+    """Returns a dict with {self.Multiply(base, i)[0]:i for i in range(start, n)}.
 
     Args:
       base: the base point
       n: the upper bound for the table.
+      start: the lower bound for the table (default 0).
+      out: optional existing dict to update in-place.
 
     Returns:
       a lookup table for the x-coordinate of the points base*i
-      for i < n.
+      for start <= i < n.
     """
-    # The implementation computes the x-coordinate of the points
-    # ((i * m) + j) * base as the sum of precomputed values
-    # (i * m) * base and j * base.
-    # The precomputed values are two lists of points of size about sqrt(n).
-    # A batch addition is used, because the x-cooredinate of the
-    # points in affine representation is needed and the batch addtions
-    # allow to reduce the number of inversions.
-    m = int(math.sqrt(n))
-    r = (n + m - 1) // m
-    sequence_low = self.PointSequence(base, m)
-    sequence_high = self.PointSequence(self.Multiply(base, m), r)
-    res = {}
+    res = out if out is not None else {}
+    count = n - start
+    if count <= 0:
+      return res
+    if count <= 2:
+      for i in range(start, n):
+        res[self.Multiply(base, i)[0]] = i
+      return res
+    h = max(1, int(math.sqrt(count // 2)))
+    m = 2 * h + 1
+    r = (count + m - 1) // m
+    sequence_low = self.PointSequence(base, h + 1)[1:]
+    step_jac = self.AffineToJacobian(self.Multiply(base, m))
+    high_jac = [None] * r
+    if start == 0:
+      high_jac[0] = self.AffineToJacobian(sequence_low[h - 1])  # pyrefly: ignore[bad-argument-type, unsupported-operation]
+    else:
+      high_jac[0] = self.AffineToJacobian(self.Multiply(base, start + h))  # pyrefly: ignore[unsupported-operation]
+    for i in range(1, r):
+      high_jac[i] = self.AddJacobian(high_jac[i - 1], step_jac)  # pyrefly: ignore[bad-argument-type, unsupported-operation]
+    sequence_high = self.BatchJacobianToAffine(high_jac)  # pyrefly: ignore[bad-argument-type]
+    del high_jac
     for i, p in enumerate(sequence_high):
-      im = i * m
-      for j, x in enumerate(self.BatchAddX(p, sequence_low)):  # pyrefly: ignore[bad-argument-type]
-        res[x] = im + j
+      center = start + i * m + h
+      res[p[0]] = center
+      sums, diffs = self.BatchAddSubtractX(p, sequence_low)  # pyrefly: ignore[bad-argument-type]
+      for j in range(h):
+        res[diffs[j]] = center - j - 1
+        res[sums[j]] = center + j + 1
     return res
 
   def BatchDL(self, points: list[EcPoint], n: int) -> list[Optional[int]]:
@@ -733,13 +762,14 @@ class EcCurve:
        The result is a list that either contains the discrete logarithms
        or None if the DL could not be bound.
     """
-    table_size = int(math.sqrt(n * len(points)))
+    if not points:
+      return []
+    table_size = max(1, int(math.sqrt(n * len(points) // 2)))
     base = self.g
     if table_size > self._table_size:
-      # TODO(pedroysb): An improvement would be to generate from
-      # self._table_size up to table_size.
-      self._table = self.PointTable(base, table_size)
-      self._table_size = table_size
+      self.PointTable(base, table_size, self._table_size, self._table)
+      self._table_size = len(self._table)
+    table_size = self._table_size
     # Computes the size of a giant step. This size can be about twice the size
     # of the table above, since the coordinate x in a table represents both
     # a point and its inverse.
@@ -748,21 +778,52 @@ class EcCurve:
     # rounding and once to adjust for the fact that DL might be a difference
     # between a giant step and a baby step.
     giant_steps = 2 + n // t
-    list_c = self.PointSequence(self.Multiply(base, -t), giant_steps)
+    table = self._table
     res = [None] * len(points)
+    if giant_steps <= 2:
+      list_c = self.PointSequence(self.Multiply(base, -t), giant_steps)
+      for i, p in enumerate(points):
+        if p == INFINITY:
+          res[i] = 0  # pyrefly: ignore[unsupported-operation]
+          continue
+        for j, x in enumerate(self.BatchAddX(p, list_c)):  # pyrefly: ignore[bad-argument-type]
+          if x in table:
+            for dl in (j * t + table[x], j * t - table[x]):
+              y = self.Multiply(base, dl)
+              if y[0] == p[0]:
+                if y[1] == p[1]:
+                  res[i] = dl  # pyrefly: ignore[unsupported-operation]
+                elif y[1] == -p[1] % self.mod:  # pyrefly: ignore[unsupported-operation]
+                  res[i] = -dl  # pyrefly: ignore[unsupported-operation]
+      return res  # pyrefly: ignore[bad-return]
+
+    h = giant_steps // 2
+    shifted_points = self.BatchAdd(self.Multiply(base, -h * t), points)
+    list_c = self.PointSequence(self.Multiply(base, t), h + 1)[1:]
     for i, p in enumerate(points):
       if p == INFINITY:
         res[i] = 0  # pyrefly: ignore[unsupported-operation]
         continue
-      for j, x in enumerate(self.BatchAddX(p, list_c)):  # pyrefly: ignore[bad-argument-type]
-        if x in self._table:
-          for dl in [j * t + self._table[x], j * t - self._table[x]]:
-            y = self.Multiply(base, dl)
-            if y[0] == p[0]:
-              if y[1] == p[1]:
-                res[i] = dl
-              elif y[1] == -p[1] % self.mod:  # pyrefly: ignore[unsupported-operation]
-                res[i] = -dl
+      pc = shifted_points[i]
+      sums, diffs = self.BatchAddSubtractX(pc, list_c)  # pyrefly: ignore[bad-argument-type]
+      candidates = []
+      if pc[0] in table:
+        candidates.append((h, pc[0]))
+      for k, xk in enumerate(sums):
+        if xk in table:
+          candidates.append((h - k - 1, xk))
+      for k, xk in enumerate(diffs):
+        if xk in table:
+          candidates.append((h + k + 1, xk))
+      for j, x in candidates:
+        tb_x = table[x]
+        for dl in (j * t + tb_x, j * t - tb_x):
+          y = self.Multiply(base, dl)
+          if y[0] == p[0]:
+            if y[1] == p[1]:
+              res[i] = dl  # pyrefly: ignore[unsupported-operation]
+            elif y[1] == -p[1] % self.mod:  # pyrefly: ignore[unsupported-operation]
+              res[i] = -dl  # pyrefly: ignore[unsupported-operation]
     return res  # pyrefly: ignore[bad-return]
 
   def ExtendedBatchDL(self, points: list[EcPoint]) -> list[Optional[int]]:
@@ -798,27 +859,101 @@ class EcCurve:
       was not found.
     """
     num_points = len(points)
+    if not num_points:
+      return []
     # The functions searches for DL of the form i * multipliers[j],
     # with 0 < i < 2**32
     multipliers = []
     bits = self.n.bit_length()
+    num_shifts = 0
     # 32 bits set in 4 adjacent bytes
     for j in range(0, bits - 31, 8):
       multipliers.append(2**j)
+      num_shifts += 1
     # Repetition of 32 bit words.
     quad_words = self.n.bit_length() // 32
     for j in range(2, quad_words + 1):
       multipliers.append(sum(2 ** (32 * i) for i in range(j)))
-    inverses = [gmpy.invert(m, self.n) for m in multipliers]
-    all_points = [None] * (len(multipliers) * num_points)
-    for j, inverse in enumerate(inverses):
-      for i, point in enumerate(points):
-        all_points[i + num_points * j] = self.Multiply(point, inverse)  # pyrefly: ignore[unsupported-operation]
-    discrete_logs = self.BatchDL(all_points, 2**32)  # pyrefly: ignore[bad-argument-type]
+    inverses = [int(gmpy.invert(m, self.n)) for m in multipliers]
+
+    # Precompute width-2 NAF for the scalars we need to multiply directly:
+    # j = num_shifts - 1 (if num_shifts > 1) and j >= num_shifts.
+    # All intermediate shift indices 1 <= j < num_shifts - 1 are obtained from
+    # j + 1 by 8 Jacobian doublings since
+    # (2**(8*j))**-1 = 2**8 * (2**(8*(j+1)))**-1.
+    direct_indices = (
+        [num_shifts - 1] if num_shifts > 1 else []
+    ) + list(range(num_shifts, len(multipliers)))
+    naf_scalars = []
+    max_naf_bit = 0
+    for idx in direct_indices:
+      s = inverses[idx]
+      pos_bits = []
+      neg_bits = []
+      b = 0
+      while s > 0:
+        if s & 1:
+          if (s & 3) == 3:
+            neg_bits.append(b)
+            s += 1
+          else:
+            pos_bits.append(b)
+            s -= 1
+          if b > max_naf_bit:
+            max_naf_bit = b
+        s >>= 1
+        b += 1
+      naf_scalars.append((idx, pos_bits, neg_bits))
+
+    mod = self.mod
+    num_mult = len(multipliers)
+    num_extra = num_mult - 1
+    all_points = list(points)
+    chunk_size = 256
+    for start in range(0, num_points, chunk_size):
+      chunk = points[start : start + chunk_size]
+      jac_chunk = [INFINITY_JACOBIAN] * (len(chunk) * num_extra)
+      for c_i, point in enumerate(chunk):
+        if point == INFINITY:
+          continue
+        base_off = c_i * num_extra
+        cur = self.AffineToJacobian(point)
+        d_pos = [None] * (max_naf_bit + 1)
+        d_neg = [None] * (max_naf_bit + 1)
+        for b in range(max_naf_bit + 1):
+          d_pos[b] = cur  # pyrefly: ignore[unsupported-operation]
+          d_neg[b] = (cur[0], (-cur[1]) % mod, cur[2])  # pyrefly: ignore[unsupported-operation]
+          if b < max_naf_bit:
+            cur = self.DoubleJacobian(cur)
+
+        for idx, pos_bits, neg_bits in naf_scalars:
+          acc = d_pos[pos_bits[0]]
+          for b in pos_bits[1:]:
+            acc = self.AddJacobian(acc, d_pos[b])  # pyrefly: ignore[bad-argument-type]
+          for b in neg_bits:
+            acc = self.AddJacobian(acc, d_neg[b])  # pyrefly: ignore[bad-argument-type]
+          jac_chunk[base_off + idx - 1] = acc  # pyrefly: ignore[unsupported-operation]
+
+        if num_shifts > 2:
+          acc = jac_chunk[base_off + num_shifts - 2]
+          for j in range(num_shifts - 2, 0, -1):
+            for _ in range(8):
+              acc = self.DoubleJacobian(acc)
+            jac_chunk[base_off + j - 1] = acc
+      all_points.extend(self.BatchJacobianToAffine(jac_chunk))
+      del jac_chunk
+
+    discrete_logs = self.BatchDL(all_points, 2**32)
     res = [None] * num_points
     for k, dlog in enumerate(discrete_logs):
       if dlog is not None:
-        res[k % num_points] = int(dlog * multipliers[k // num_points])  # pyrefly: ignore[unsupported-operation]
+        if k < num_points:
+          res[k] = int(dlog)  # pyrefly: ignore[unsupported-operation]
+        else:
+          rel = k - num_points
+          pt_idx = rel // num_extra
+          m_idx = (rel % num_extra) + 1
+          res[pt_idx] = int(dlog * multipliers[m_idx])  # pyrefly: ignore[unsupported-operation]
     return res  # pyrefly: ignore[bad-return]
 
   def BatchDLOfDifferences(
@@ -834,7 +969,8 @@ class EcCurve:
     p - q = k * G with abs(k) < max_diff.
 
     The complexity of this test is
-    O(max_diff + len(points) * (len(other_points) + len(points) // 2))
+    O(min(max_diff + len(points) * (len(other_points) + len(points) // 2),
+          (len(points) + len(other_points)) * sqrt(max_diff)))
 
     Args:
       points: the points of the public keys being tested.
@@ -856,11 +992,87 @@ class EcCurve:
     if not points or len(points) + len(other_points) < 2:
       return res  # pyrefly: ignore[bad-return]
     base = self.g
+    n_pts = len(points)
+    m_other = len(other_points)
+    h = max(1, int(math.sqrt(max_diff // 4)))
+    m = 2 * h + 1
+    r = (max_diff - 1 + h) // m
+    pairwise_cost = (
+        max(0, max_diff - self._table_size) // 2
+        + n_pts * m_other
+        + n_pts * (n_pts - 1) // 2
+    )
+    bsgs_cost = h + r + (n_pts + m_other - 1) * h + n_pts * r
+    if bsgs_cost < pairwise_cost:
+      seq_baby = self.PointSequence(base, h + 1)[1:]
+      seq_giant = (
+          self.PointSequence(self.Multiply(base, m), r + 1)[1:] if r else []
+      )
+      baby_table: dict[Coordinate, int | list[int]] = {}
+      shift = (2 * h + 1).bit_length()
+      mask = (1 << shift) - 1
+
+      def InsertBaby(x: Coordinate, entry: int):
+        existing = baby_table.get(x)
+        if existing is None:
+          baby_table[x] = entry
+        elif isinstance(existing, list):
+          existing.append(entry)
+        else:
+          baby_table[x] = [existing, entry]
+
+      def AddBabySteps(q: EcPoint, pt_idx: int):
+        idx_prefix = pt_idx << shift
+        InsertBaby(q[0], idx_prefix | h)
+        sums, diffs = self.BatchAddSubtractX(q, seq_baby)  # pyrefly: ignore[bad-argument-type]
+        for k in range(h):
+          b = k + 1
+          InsertBaby(sums[k], idx_prefix | (h + b))
+          InsertBaby(diffs[k], idx_prefix | (h - b))
+
+      for j, q in enumerate(other_points):
+        AddBabySteps(q, j)
+
+      for i, p in enumerate(points):
+        giant_steps = [(0, p[0])]
+        if r:
+          g_sums, g_diffs = self.BatchAddSubtractX(p, seq_giant)  # pyrefly: ignore[bad-argument-type]
+          for k in range(r):
+            g = k + 1
+            giant_steps.append((g, g_diffs[k]))
+            giant_steps.append((-g, g_sums[k]))
+        for g, x in giant_steps:
+          matches = baby_table.get(x)
+          if matches is not None:
+            for entry in (
+                matches if isinstance(matches, list) else (matches,)
+            ):
+              pt_idx = entry >> shift
+              b = (entry & mask) - h
+              q = (
+                  other_points[pt_idx]
+                  if pt_idx < m_other
+                  else points[pt_idx - m_other]
+              )
+              if p == q:
+                continue
+              dl = g * m + b
+              if -max_diff < dl < max_diff:
+                if self.Subtract(p, q) == self.Multiply(base, dl):
+                  res[i] = "key - (%x, %x) = %d * G" % (q[0], q[1], dl)  # pyrefly: ignore[unsupported-operation]
+                  if pt_idx >= m_other:
+                    res[pt_idx - m_other] = "key - (%x, %x) = %d * G" % (  # pyrefly: ignore[unsupported-operation]
+                        p[0],
+                        p[1],
+                        -dl,
+                    )
+        if i + 1 < n_pts:
+          AddBabySteps(p, m_other + i)
+      return res  # pyrefly: ignore[bad-return]
+
     if max_diff > self._table_size:
-      # TODO(pedroysb): An improvement would be to generate from
-      # self._table_size up to max_diff.
-      self._table = self.PointTable(base, max_diff)
-      self._table_size = max_diff
+      self.PointTable(base, max_diff, self._table_size, self._table)
+      self._table_size = len(self._table)
     negated = [self.Negate(q) for q in other_points]
     for i, p in enumerate(points):
       for j, x in enumerate(self.BatchAddX(p, negated)):
