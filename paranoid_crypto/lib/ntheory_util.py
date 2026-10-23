@@ -203,9 +203,15 @@ def DivmodRounded(a: int, b: int) -> tuple[int, int]:
 
 def Sieve(n: int) -> list[int]:
   """Using Sieve of Eratosthenes, returns all primes lower than n."""
-  table = [True] * n
-  for i in range(2, gmpy.isqrt(n) + 1):
+  if n <= 2:
+    return []
+  table = bytearray(b"\x01") * n
+  table[0] = 0
+  table[1] = 0
+  table[4:n:2] = bytes((n - 5) // 2 + 1)
+  for i in range(3, int(gmpy.isqrt(n - 1)) + 1, 2):
     if table[i]:
-      for j in range(i * i, n, i):
-        table[j] = False
-  return [i for i, v in enumerate(table) if v][2:]
+      step = 2 * i
+      start = i * i
+      table[start:n:step] = bytes((n - 1 - start) // step + 1)
+  return [i for i, v in enumerate(table) if v]

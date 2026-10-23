@@ -405,6 +405,8 @@ class CheckPermutedBitPatterns(base_check.RSAKeyCheck):
 class CheckPollardpm1(base_check.RSAKeyCheck):
   """Runs checks using Pollard's p-1 factorization algorithm."""
 
+  _M_CACHE: dict[Optional[int], int] = {}
+
   def __init__(self, bound: Optional[int] = None):
     """CheckPollardpm1 check constructor.
 
@@ -414,6 +416,9 @@ class CheckPollardpm1(base_check.RSAKeyCheck):
         a value estimated to be able to find factors when p-1 is up to 20 bits.
     """
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_CRITICAL)
+    if bound in CheckPollardpm1._M_CACHE:
+      self._m = CheckPollardpm1._M_CACHE[bound]
+      return
     if bound:
       # bound-powersmooth
       powers = list(map(gmpy.mpz, ntheory_util.Sieve(bound)))
@@ -431,6 +436,7 @@ class CheckPollardpm1(base_check.RSAKeyCheck):
       for i in range(150):
         powers[i] = powers[i] ** int(math.log(powersmooth, powers[i]))
       self._m = ntheory_util.FastProduct(powers)
+    CheckPollardpm1._M_CACHE[bound] = self._m
 
   def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
     any_weak = False

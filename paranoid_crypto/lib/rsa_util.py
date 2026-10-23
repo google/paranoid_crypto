@@ -13,7 +13,6 @@
 # limitations under the License.
 """Set of math functions that are useful when checking RSA."""
 
-import heapq
 from typing import Optional
 import gmpy2 as gmpy
 from paranoid_crypto.lib import lll
@@ -75,21 +74,70 @@ def FermatFactor(n: int, max_steps: int) -> Optional[tuple[int, int]]:
   if n % 2 == 0:
     return 2, n // 2
 
+  n = gmpy.mpz(n)
   a = gmpy.isqrt(n)
   if a * a == n:
     return a, a
 
   a += 1  # ceil(sqrt(n))
+  if max_steps <= 0:
+    return None
+  a_end = a + max_steps
+
+  # Modulo 16 / modulo 8 analysis of a^2 - n = b^2:
+  # - If n % 16 in (1, 13): b is even (b^2 % 16 in (0, 4)), so a^2 % 16 == 1
+  #   -> a % 8 in (1, 7).
+  # - If n % 16 in (5, 9): b is even (b^2 % 16 in (0, 4)), so a^2 % 16 == 9
+  #   -> a % 8 in (3, 5).
+  # - If n % 8 == 3: b is odd (b^2 % 8 == 1), so a^2 % 8 == 4
+  #   -> a % 8 in (2, 6).
+  # - If n % 8 == 7: b is odd (b^2 % 8 == 1), so a^2 % 8 == 0
+  #   -> a % 8 in (0, 4).
+  n_mod16 = int(n & 15)
+  if n_mod16 in (1, 13):
+    r1, r2 = 1, 7
+  elif n_mod16 in (5, 9):
+    r1, r2 = 3, 5
+  elif (n_mod16 & 7) == 3:
+    r1, r2 = 2, 6
+  else:
+    r1, r2 = 0, 4
+
+  a_mod8 = int(a & 7)
+  dist1 = (r1 - a_mod8) & 7
+  dist2 = (r2 - a_mod8) & 7
+  if dist1 < dist2:
+    a += dist1
+    d1 = (r2 - r1) & 7
+  else:
+    a += dist2
+    d1 = (r1 - r2) & 7
+  d2 = 8 - d1
+
   b2 = a * a - n
+  two_a = 2 * a
+  two_a_end = 2 * a_end
+  d1_sq = d1 * d1
+  d2_sq = d2 * d2
+  two_d1 = 2 * d1
+  two_d2 = 2 * d2
+  is_square = gmpy.is_square
 
-  for _ in range(max_steps):
-    if gmpy.is_square(b2):
-      return a + gmpy.isqrt(b2), a - gmpy.isqrt(b2)
-
-    # or a += 1; b2 = a * a - n
-    b2 += a
-    a += 1
-    b2 += a
+  while two_a < two_a_end:
+    if is_square(b2):
+      cur_a = two_a >> 1
+      b = gmpy.isqrt(b2)
+      return cur_a + b, cur_a - b
+    b2 += d1 * two_a + d1_sq
+    two_a += two_d1
+    if two_a >= two_a_end:
+      break
+    if is_square(b2):
+      cur_a = two_a >> 1
+      b = gmpy.isqrt(b2)
+      return cur_a + b, cur_a - b
+    b2 += d2 * two_a + d2_sq
+    two_a += two_d2
 
   return None
 
@@ -279,18 +327,46 @@ def CheckContinuedFraction(n: int, bound: int) -> tuple[bool, list[int]]:
       The test can fail even if no factors were found, but the continued
       fraction has a large coefficient.
   """
-  m = 2 ** n.bit_length()
-  cf = ntheory_util.ContinuedFraction(n, m)
-  x = 2 ** (n.bit_length() // 2)
-  for quot, _, v in cf:
-    r, c = ntheory_util.DivmodRounded(n * v, x)
-    a, b = ntheory_util.DivmodRounded(r, x)
-    if a and c and gmpy.is_square(b * b - 4 * a * c):
-      t = gmpy.isqrt(b * b - 4 * a * c)
-      for rt in (t, -t):
-        p = gmpy.gcd(n, 2 * a * x + b + rt)
-        if 1 < p < n:
-          return False, [p, n // p]
+  n = gmpy.mpz(n)
+  bits = n.bit_length()
+  m = gmpy.mpz(1) << bits
+  half_bits = bits // 2
+  x = gmpy.mpz(1) << half_bits
+  d = (x + 1) >> 1
+  mask = x - 1
+  is_square = gmpy.is_square
+
+  a_cf, b_cf = n, m
+  u0, u1 = gmpy.mpz(0), gmpy.mpz(1)
+  neg_rem = True
+  while b_cf:
+    quot, rem = divmod(a_cf, b_cf)
+    a_cf, b_cf = b_cf, rem
+    u0, u1 = u1, quot * u1 + u0
+    # By the continued fraction identity, u1 * m - v1 * n = (-1)^k * rem,
+    # so n * v1 == (u1 << bits) + rem when k is odd (neg_rem=True), and
+    # (u1 << bits) - rem when k is even (neg_rem=False).
+    nv = (u1 << bits) + rem if neg_rem else (u1 << bits) - rem
+    neg_rem = not neg_rem
+    if half_bits:
+      nv_d = nv + d
+      r = nv_d >> half_bits
+      c = (nv_d & mask) - d
+      r_d = r + d
+      a = r_d >> half_bits
+      b = (r_d & mask) - d
+    else:
+      r, c = ntheory_util.DivmodRounded(nv, x)
+      a, b = ntheory_util.DivmodRounded(r, x)
+    if a and c:
+      disc = b * b - 4 * a * c
+      if is_square(disc):
+        t = gmpy.isqrt(disc)
+        two_a_x_b = (a << (half_bits + 1)) + b
+        for rt in (t, -t):
+          p = gmpy.gcd(n, two_a_x_b + rt)
+          if 1 < p < n:
+            return False, [p, n // p]
     if quot >= bound:
       # There is a large coefficient in the continued fraction of n and m,
       # but no factorization was found.
@@ -534,33 +610,14 @@ def CheckLowHammingWeight(
     """
     return rem_size + 5 * hamming_weight
 
-  # A heap containing partial factorizations.
-  # This heap is being used by the function Push below.
-  # Elements in the heap are quintuples (v, hw, bit, p0, q0) where:
-  #   v: is the result of the function Heuristic above.
+  # Bucket priority queue (Dial's algorithm) indexed by heuristic value v.
+  # Elements in buckets[v] are 5-tuples (hw, bit, p0, q0, rem0) where:
   #   hw: is the sum of the Hamming weights of p0 and q0.
   #   bit: is the number of missing bits in p0 and q0.
   #   p0: a guess for the msbs of p, i.e., the value p >> bit.
   #   q0: a guess for the msbs of q, i.e., the value q >> bit.
-  heap = []
-
-  def Push(p0: int, q0: int, hw: int, bit: int, rem_size: int):
-    """Computes the heuristic and pushes the values into the priority queue.
-
-    Args:
-      p0: a partial factor.
-      q0: a partial factor.
-      hw: the sum of the Hamming weights of p0 and q0
-      bit: the number of bits that are still to guess.
-      rem_size: (n - (p << bit) * (q << bit)).bit_length()
-    """
-    # invariants:
-    # assert (p0 << bit) * (q0 << bit) <= n < ((p0+1) << bit) * ((q0+1) << bit)
-
-    # The algorithm looks for a factorization where p <= q.
-    if p0 <= q0:
-      v = rem_size + 5 * hw
-      heapq.heappush(heap, (v, hw, bit, p0, q0))
+  #   rem0: the remainder (n >> (2 * bit)) - p0 * q0.
+  n = int(n)
 
   # There are two thresholds for the heurisitic.
   # If no value of the heuristic smaller than threshold_cutoff is found then
@@ -577,45 +634,98 @@ def CheckLowHammingWeight(
   threshold_weak = n.bit_length() - 12
 
   psize = (n.bit_length() + 1) // 2
+  n_limbs = [(n >> (2 * b)) & 3 for b in range(psize)]
   steps = 0
   remainder = n - (1 << (2 * (psize - 1)))
-  Push(1, 1, 2, psize - 1, remainder.bit_length())
-  # smallest value for the heuristic
   minv = Heuristic(2, remainder.bit_length())
-  while steps < maxsteps and heap:
+  cur_v = minv
+  buckets: list[Optional[list[tuple[int, int, int, int, int]]]] = [None] * (
+      12 * psize + 25
+  )
+  buckets[cur_v] = [(2, psize - 1, 1, 1, remainder >> (2 * (psize - 1)))]
+  queued = 1
+
+  while steps < maxsteps and queued:
     steps += 1
     if steps == cutoff:
       if minv >= threshold_cutoff:
         break
 
-    v, hw, bit, p, q = heapq.heappop(heap)
-    if v < minv:
-      minv = v
+    bucket = buckets[cur_v]
+    while not bucket:
+      cur_v += 1
+      bucket = buckets[cur_v]
+    hw, bit, p, q, rem = bucket.pop()
+    queued -= 1
+
     # Doing computations on the msbs only saves 40% CPU time.
     while bit >= 1:
       p <<= 1
       q <<= 1
       bit -= 1
-      n0 = n >> (2 * bit)
-      for dp, dq in ((0, 1), (1, 0), (1, 1)):
-        # min = pq + p, pq + q, pq + p + q + 1
-        p0 = p + dp
-        q0 = q + dq
-        # The algorithm guesses at this point that the factors of n are
-        # in the range [p0 << bit, (p0 + 1) << bit]
-        # and the range [p1 << bit, (p1 + 1) << bit].
-        rem0 = n0 - p0 * q0
-        if rem0 < 0:
-          break
-        if bit:
-          if rem0 <= p0 + q0:
-            rem_size = rem0.bit_length() + 2 * bit
-            Push(p0, q0, hw + dp + dq, bit, rem_size)
-        else:
-          if rem0 == 0:
-            return True, [p0, q0]
-      else:
-        if rem0 > 0:
-          break
+      rem = (rem << 2) | n_limbs[bit]
+      if rem < p:
+        continue
+      bound = p + q + 1
+      base_v = 2 * bit + 5 * hw + 5
+      # dp=0, dq=1: p0 = p, q0 = q + 1, p0 * q0 = p * q + p (always p <= q + 1)
+      rem0 = rem - p
+      if bit:
+        if rem0 <= bound:
+          v_new = rem0.bit_length() + base_v
+          target = buckets[v_new]
+          if target is None:
+            buckets[v_new] = [(hw + 1, bit, p, q + 1, rem0)]
+          else:
+            target.append((hw + 1, bit, p, q + 1, rem0))
+          queued += 1
+          if v_new < cur_v:
+            cur_v = v_new
+            if v_new < minv:
+              minv = v_new
+      elif rem0 == 0:
+        return True, [p, q + 1]
+
+      # dp=1, dq=0: p0 = p + 1, q0 = q, p0 * q0 = p * q + q (p0 <= q0 iff p < q)
+      rem0 = rem - q
+      if rem0 < 0:
+        continue
+      if bit:
+        if rem0 <= bound and p < q:
+          v_new = rem0.bit_length() + base_v
+          target = buckets[v_new]
+          if target is None:
+            buckets[v_new] = [(hw + 1, bit, p + 1, q, rem0)]
+          else:
+            target.append((hw + 1, bit, p + 1, q, rem0))
+          queued += 1
+          if v_new < cur_v:
+            cur_v = v_new
+            if v_new < minv:
+              minv = v_new
+      elif rem0 == 0 and p < q:
+        return True, [p + 1, q]
+
+      # dp=1, dq=1: p0 = p + 1, q0 = q + 1, p0 * q0 = p * q + p + q + 1
+      rem0 = rem0 - p - 1
+      if rem0 < 0:
+        continue
+      if bit:
+        if rem0 <= bound + 1:
+          v_new = rem0.bit_length() + base_v + 5
+          target = buckets[v_new]
+          if target is None:
+            buckets[v_new] = [(hw + 2, bit, p + 1, q + 1, rem0)]
+          else:
+            target.append((hw + 2, bit, p + 1, q + 1, rem0))
+          queued += 1
+          if v_new < cur_v:
+            cur_v = v_new
+            if v_new < minv:
+              minv = v_new
+      elif rem0 == 0:
+        return True, [p + 1, q + 1]
+      if rem0 > 0:
+        break
   potentially_weak = minv <= threshold_weak
   return potentially_weak, []
