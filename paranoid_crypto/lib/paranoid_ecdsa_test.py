@@ -16,6 +16,7 @@
 import copy
 from absl.testing import absltest
 from paranoid_crypto import paranoid_pb2
+from paranoid_crypto.lib import ec_util
 from paranoid_crypto.lib import paranoid
 from paranoid_crypto.lib import paranoid_base_test
 from paranoid_crypto.lib import util
@@ -555,6 +556,71 @@ class ParanoidECDSATest(paranoid_base_test.ParanoidBaseTest):
     check = ecdsa_sig_checks.CheckNonceMSB()
     self.assertTrue(check.Check(bad_ecdsa_msb))
     self.assertResults(bad_ecdsa_msb, check.check_name, True)
+
+    # Nonce reuse (r1 == r2 with different message hashes) should be caught
+    # directly even when nonces have full bit length.
+    curve = ec_util.CURVE_FACTORY[paranoid_pb2.CurveType.CURVE_SECP256R1]
+    assert curve is not None
+    d = int(
+        '519b423d715f8b581f4fa8ee59f4771a5b44c8130b4e3eacca54a56dda72b464',
+        16,
+    )
+    pub_x, pub_y = curve.Multiply(curve.g, d)
+    assert pub_x is not None and pub_y is not None
+    k = int(
+        '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
+        16,
+    )
+    k_x, _ = curve.Multiply(curve.g, k)
+    assert k_x is not None
+    r = int(k_x) % curve.n
+    k_inv = int(ec_util.gmpy.invert(k, curve.n))
+    reuse_sigs = []
+    for z in (123456789, 987654321):
+      s = (k_inv * (z + r * d)) % curve.n
+      sig = paranoid_pb2.ECDSASignature()
+      sig.ecdsa_sig_info.algorithm = (
+          paranoid_pb2.SignatureAlgorithm.ECDSA_WITH_SHA256
+      )
+      sig.ecdsa_sig_info.r = util.Int2Bytes(r)
+      sig.ecdsa_sig_info.s = util.Int2Bytes(s)
+      sig.ecdsa_sig_info.message_hash = int(z).to_bytes(32, 'big')
+      sig.issuer_key_info.curve_type = paranoid_pb2.CurveType.CURVE_SECP256R1
+      sig.issuer_key_info.x = util.Int2Bytes(int(pub_x))
+      sig.issuer_key_info.y = util.Int2Bytes(int(pub_y))
+      reuse_sigs.append(sig)
+    self.assertTrue(check.Check(reuse_sigs))
+    self.assertResults(reuse_sigs, check.check_name, True)
+
+    # Single signature where both private key and nonce have 140 MSB zero bits
+    # (caught via INCLUDE_KEY).
+    d_small = (1 << 115) + 0x123456789ABCDEF
+    k_small = (1 << 115) + 0xFEDCBA987654321
+    pub_s_x, pub_s_y = curve.Multiply(curve.g, d_small)
+    assert pub_s_x is not None and pub_s_y is not None
+    ks_x, _ = curve.Multiply(curve.g, k_small)
+    assert ks_x is not None
+    r_s = int(ks_x) % curve.n
+    z_s = int(
+        '88185d128d9922e0e6bcd32b07b6c7f20f27968eab447a1d8d1cdf250f79f7d3',
+        16,
+    )
+    k_inv_s = int(ec_util.gmpy.invert(k_small, curve.n))
+    s_s = (k_inv_s * (z_s + r_s * d_small)) % curve.n
+    single_sig = paranoid_pb2.ECDSASignature()
+    single_sig.ecdsa_sig_info.algorithm = (
+        paranoid_pb2.SignatureAlgorithm.ECDSA_WITH_SHA256
+    )
+    single_sig.ecdsa_sig_info.r = util.Int2Bytes(r_s)
+    single_sig.ecdsa_sig_info.s = util.Int2Bytes(s_s)
+    single_sig.ecdsa_sig_info.message_hash = int(z_s).to_bytes(32, 'big')
+    single_sig.issuer_key_info.curve_type = (
+        paranoid_pb2.CurveType.CURVE_SECP256R1
+    )
+    single_sig.issuer_key_info.x = util.Int2Bytes(int(pub_s_x))
+    single_sig.issuer_key_info.y = util.Int2Bytes(int(pub_s_y))
+    self.assertTrue(check.Check([single_sig]))
+    self.assertResults([single_sig], check.check_name, True)
 
   def testCheckNonceCommonPrefix(self):
     check = ecdsa_sig_checks.CheckNonceCommonPrefix()
