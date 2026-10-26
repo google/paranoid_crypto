@@ -186,6 +186,11 @@ class EcUtilTest(parameterized.TestCase):
         self.assertLessEqual(dl_bound, abs(dls[i]))
       else:
         self.assertEqual(dls[i], dl)
+    # Verify negative discrete logs within the first baby-step table range are
+    # normalized modulo c.n.
+    neg_point = c.Multiply(c.g, c.n - 1)
+    neg_res = c.BatchDL([neg_point], 16)
+    self.assertEqual(neg_res[0], c.n - 1)
 
   @parameterized.named_parameters(*main_curves)
   def testExtendedBatchDL(self, c: ec_util.EcCurve):

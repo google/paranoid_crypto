@@ -792,9 +792,9 @@ class EcCurve:
               y = self.Multiply(base, dl)
               if y[0] == p[0]:
                 if y[1] == p[1]:
-                  res[i] = dl  # pyrefly: ignore[unsupported-operation]
+                  res[i] = dl % self.n  # pyrefly: ignore[unsupported-operation]
                 elif y[1] == -p[1] % self.mod:  # pyrefly: ignore[unsupported-operation]
-                  res[i] = -dl  # pyrefly: ignore[unsupported-operation]
+                  res[i] = (-dl) % self.n  # pyrefly: ignore[unsupported-operation]
       return res  # pyrefly: ignore[bad-return]
 
     h = giant_steps // 2
@@ -821,9 +821,9 @@ class EcCurve:
           y = self.Multiply(base, dl)
           if y[0] == p[0]:
             if y[1] == p[1]:
-              res[i] = dl  # pyrefly: ignore[unsupported-operation]
+              res[i] = dl % self.n  # pyrefly: ignore[unsupported-operation]
             elif y[1] == -p[1] % self.mod:  # pyrefly: ignore[unsupported-operation]
-              res[i] = -dl  # pyrefly: ignore[unsupported-operation]
+              res[i] = (-dl) % self.n  # pyrefly: ignore[unsupported-operation]
     return res  # pyrefly: ignore[bad-return]
 
   def ExtendedBatchDL(self, points: list[EcPoint]) -> list[Optional[int]]:
@@ -948,12 +948,12 @@ class EcCurve:
     for k, dlog in enumerate(discrete_logs):
       if dlog is not None:
         if k < num_points:
-          res[k] = int(dlog)  # pyrefly: ignore[unsupported-operation]
+          res[k] = int(dlog % self.n)  # pyrefly: ignore[unsupported-operation]
         else:
           rel = k - num_points
           pt_idx = rel // num_extra
           m_idx = (rel % num_extra) + 1
-          res[pt_idx] = int(dlog * multipliers[m_idx])  # pyrefly: ignore[unsupported-operation]
+          res[pt_idx] = int((dlog * multipliers[m_idx]) % self.n)  # pyrefly: ignore[unsupported-operation]
     return res  # pyrefly: ignore[bad-return]
 
   def BatchDLOfDifferences(
