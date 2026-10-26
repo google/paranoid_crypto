@@ -100,6 +100,38 @@ class RsaUtilTest(absltest.TestCase):
     self.assertFalse(res)
     self.assertEmpty(factors)
 
+    # Both p-1 and q-1 divide m, but with different 2-adic valuations (p=17,
+    # q=23: p-1=16, q-1=2*11), so stripping powers of 2 splits n:
+    res, factors = rsa_util.Pollardpm1(17 * 23, m=16 * 11, gcd_bound=1)
+    self.assertTrue(res)
+    self.assertCountEqual(factors, [17, 23])
+
+    # Williams p+1 smoothness: p=19 (p+1=20), q=59 (q+1=60), gcd(n-1, 60)=20,
+    # neither p-1=18 nor q-1=58 divides m=60, but p+1 and q+1 divide 60:
+    res, factors = rsa_util.Pollardpm1(19 * 59, m=60, gcd_bound=10)
+    self.assertTrue(res)
+    self.assertCountEqual(factors, [19, 59])
+
+  def testCheckContinuedFractionOddBits(self):
+    # Two 124-bit primes whose product is 247 bits (odd bit length) with
+    # repeating patterns:
+    p = int(gmpy.next_prime(int('8a157ca157ca157ca157ca157ca1000', 16)))
+    q = int(gmpy.next_prime(int('91acb1acb1acb1acb1acb1acb100000', 16)))
+    n = p * q
+    self.assertEqual(n.bit_length(), 247)
+    ok, factors = rsa_util.CheckContinuedFraction(n, bound=2**48)
+    self.assertFalse(ok)
+    self.assertCountEqual(factors, [p, q])
+
+  def testCheckSmallUpperDifferences256(self):
+    # 1024-bit modulus (prime_size=512) with q - p = 2**(512 - 256) + delta
+    p = int(gmpy.next_prime(2**511 + 2**510 + 123456789))
+    q = int(gmpy.next_prime(p + 2**256 + 2**200 + 98765))
+    n = p * q
+    factors = rsa_util.CheckSmallUpperDifferences(n)
+    self.assertIsNotNone(factors)
+    self.assertCountEqual(factors, [p, q])
+
 
 if __name__ == '__main__':
   absltest.main()

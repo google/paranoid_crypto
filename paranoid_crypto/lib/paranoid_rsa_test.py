@@ -257,6 +257,26 @@ class ParanoidRSATest(paranoid_base_test.ParanoidBaseTest):
     self.assertTrue(check.Check(bad_rsa_keys_roca))
     self.assertResults(bad_rsa_keys_roca, check.check_name, True)
 
+    # 512-bit ROCA key (uses primorial M_512 up to prime 167, excluding 173).
+    m_512 = 1
+    for p in check._fc.PRIMES[:-1]:
+      m_512 *= p
+    p_roca = (pow(65537, 10, m_512) + 12345 * m_512)
+    q_roca = (pow(65537, 20, m_512) + 23456 * m_512)
+    n_512 = p_roca * q_roca
+    # Ensure n_512 is <= 512 bits and n_512 % 173 is not in <65537> mod 173.
+    while (
+        n_512.bit_length() > 512
+        or check._fc._HasDiscreteLog(n_512 % 173, 65537, 173)
+    ):
+      q_roca += m_512
+      n_512 = p_roca * q_roca
+    key_512 = paranoid_pb2.RSAKey()
+    key_512.rsa_info.e = util.Hex2Bytes('010001')
+    key_512.rsa_info.n = util.Int2Bytes(n_512)
+    self.assertTrue(check.Check([key_512]))
+    self.assertResults([key_512], check.check_name, True)
+
   def testCheckROCAVariant(self):
     check = rsa_single_checks.CheckROCAVariant()
     self.assertTrue(check.Check(bad_rsa_keys_roca_variant))
