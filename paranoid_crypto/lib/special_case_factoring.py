@@ -91,14 +91,18 @@ def FactorWithGuess(n: int, p_0: int) -> Optional[list[int]]:
     # method does not work if one of the factors is even and the other one is
     # odd.
     if rem < bound:
+      if u1 * v1 > bound:
+        return None
       d = 4 * u1 * v1 * n
       s = gmpy.isqrt(d)
       if s * s < d:
         s += 1
-      if gmpy.is_square(s * s - d):
-        t = gmpy.isqrt(s * s - d)
-        g = gmpy.gcd(s + t, n)
-        if 1 < g < n:
-          return [g, n // g]
+      for cand_s in (s, s + 1):
+        if gmpy.is_square(cand_s * cand_s - d):
+          t = gmpy.isqrt(cand_s * cand_s - d)
+          g = gmpy.gcd(cand_s + t, n)
+          if 1 < g < n:
+            return [g, n // g]
+    elif u1 * v1 > bound:
       return None
   return None

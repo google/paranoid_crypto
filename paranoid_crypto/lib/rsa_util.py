@@ -334,6 +334,11 @@ def CheckContinuedFraction(n: int, bound: int) -> tuple[bool, list[int]]:
   x = gmpy.mpz(1) << half_bits
   d = (x + 1) >> 1
   mask = x - 1
+  odd_bits = bool(bits & 1)
+  half_bits_hi = half_bits + 1
+  x_hi = x << 1
+  d_hi = (x_hi + 1) >> 1
+  mask_hi = x_hi - 1
   is_square = gmpy.is_square
 
   a_cf, b_cf = n, m
@@ -367,6 +372,26 @@ def CheckContinuedFraction(n: int, bound: int) -> tuple[bool, list[int]]:
           p = gmpy.gcd(n, two_a_x_b + rt)
           if 1 < p < n:
             return False, [p, n // p]
+    if odd_bits:
+      # When n has an odd bit length (e.g., 2047-bit product of two 1024-bit
+      # primes), the prime bit size is (bits + 1) // 2, so the quadratic base is
+      # x_hi = 2 ** ((bits + 1) // 2) with x_hi^2 = 2 * m.
+      for nv_hi in (nv, nv << 1):
+        nv_d = nv_hi + d_hi
+        r = nv_d >> half_bits_hi
+        c = (nv_d & mask_hi) - d_hi
+        r_d = r + d_hi
+        a = r_d >> half_bits_hi
+        b = (r_d & mask_hi) - d_hi
+        if a and c:
+          disc = b * b - 4 * a * c
+          if is_square(disc):
+            t = gmpy.isqrt(disc)
+            two_a_x_b = (a << (half_bits_hi + 1)) + b
+            for rt in (t, -t):
+              p = gmpy.gcd(n, two_a_x_b + rt)
+              if 1 < p < n:
+                return False, [p, n // p]
     if quot >= bound:
       # There is a large coefficient in the continued fraction of n and m,
       # but no factorization was found.
@@ -490,7 +515,15 @@ def CheckSmallUpperDifferences(n: int) -> Optional[list[int]]:
   ]
   for diff in differences:
     # find an approximation p0 for p such that p - n // q is approx. diff.
-    p0 = gmpy.isqrt(n + (diff // 2) ** 2) + diff // 2
+    s0 = gmpy.isqrt(n + (diff // 2) ** 2)
+    for cand_s in (s0, s0 + 1, s0 + 2):
+      rem_sq = cand_s * cand_s - n
+      if gmpy.is_square(rem_sq):
+        t = gmpy.isqrt(rem_sq)
+        p = cand_s - t
+        if 1 < p < n and n % p == 0:
+          return [p, n // p]
+    p0 = s0 + diff // 2
     factors = special_case_factoring.FactorWithGuess(n, p0)
     if factors:
       return factors
@@ -547,7 +580,29 @@ def Pollardpm1(
     if 1 < p < n:
       return True, [p, n // p]
     if p == n:
+      m_odd = m >> ((m & -m).bit_length() - 1)  # pyrefly: ignore[unsupported-operation]
+      b = pow(a, m_odd, n)  # pyrefly: ignore[no-matching-overload]
+      while b != 1:
+        g = gmpy.gcd(b - 1, n)
+        if 1 < g < n:
+          return True, [g, n // g]
+        b = (b * b) % n
       return True, []
+    # When gcd(n - 1, m) >= gcd_bound but p == 1, the smooth shared factor in
+    # n - 1 = p * q - 1 may divide p + 1 and q + 1 (Williams p+1 smoothness).
+    if m and m > 0:
+      v0 = gmpy.mpz(5)
+      v1 = gmpy.mpz(23) % n
+      for bit in bin(m)[3:]:
+        if bit == "1":
+          v0 = (v0 * v1 - 5) % n
+          v1 = (v1 * v1 - 2) % n
+        else:
+          v1 = (v0 * v1 - 5) % n
+          v0 = (v0 * v0 - 2) % n
+      p = gmpy.gcd(v0 - 2, n)
+      if 1 < p < n:
+        return True, [p, n // p]
   return False, []
 
 

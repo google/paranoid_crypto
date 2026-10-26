@@ -46,7 +46,10 @@ class ROCAKeyDetector(object):
       (bool) True if the provided key is (with high probability) weak.
     """
     mod_product_of_primes = modulus % self.product_of_primes
-    for prime in self.PRIMES:
+    # Infineon's 512-bit ROCA keys only use the primorial up to 167 (excluding
+    # 173). Checking 173 on 512-bit keys causes a 75% false-negative rate.
+    primes = self.PRIMES[:-1] if modulus.bit_length() <= 512 else self.PRIMES
+    for prime in primes:
       mod_p = mod_product_of_primes % prime
       if not self._HasDiscreteLog(mod_p, self.F4, prime):
         return False
