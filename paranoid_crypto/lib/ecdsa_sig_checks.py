@@ -92,14 +92,30 @@ class BiasedBaseCheck(base_check.ECDSASignatureCheck):
       pks = _MapIssuerSigIndexes(sigs)
       guesses = set()
       for _, idxs in pks.items():
-        # Exclude duplicate signatures from the actual processing
-        unique_vals = list({
-            ec_util.ECDSAValues(sigs[idx].ecdsa_sig_info, curve) for idx in idxs
-        })
-        a, b = [None] * len(unique_vals), [None] * len(unique_vals)
+        # Exclude duplicate signatures from the actual processing while
+        # preserving signature order for sliding-window checks.
+        unique_vals = list(
+            dict.fromkeys(
+                ec_util.ECDSAValues(sigs[idx].ecdsa_sig_info, curve)
+                for idx in idxs
+            )
+        )
+        a, b = [0] * len(unique_vals), [0] * len(unique_vals)
+        seen_r: dict[int, tuple[int, int]] = {}
         for i in range(len(unique_vals)):
           r, s, z = unique_vals[i]
-          a[i], b[i] = curve.HiddenNumberParams(r, s, z)  # pyrefly: ignore[unsupported-operation]
+          ai, bi = curve.HiddenNumberParams(r, s, z)
+          a[i], b[i] = ai, bi
+          if r in seen_r:
+            a0, b0 = seen_r[r]
+            for da, db in ((ai - a0, bi - b0), (ai + a0, bi + b0)):
+              db_mod = db % curve.n
+              if db_mod != 0:
+                guesses.add(
+                    int((-da * ec_util.gmpy.invert(db_mod, curve.n)) % curve.n)
+                )
+          else:
+            seen_r[r] = (ai, bi)
         if self.bias:
           # For general biases it makes sense to check with different sizes for
           # the sets of signatures. E.g., 24 to catch simple LCGs, 48 to catch
@@ -115,6 +131,14 @@ class BiasedBaseCheck(base_check.ECDSASignatureCheck):
             if len(a) <= size:
               # Tests with a larger window are not leading to additional tests.
               break
+          if len(a) < 8 and self.bias != hnp.Bias.GENERALIZED:
+            # Also test assuming the private key was generated with the same
+            # biased RNG as the signature nonces (analogous to INCLUDE_KEY).
+            guesses.update(
+                hnp.HiddenNumberProblem(
+                    a + [0], b + [1], None, curve.n, self.bias  # pyrefly: ignore[bad-argument-type]
+                )
+            )
         elif self.lcg_params:
           guesses.update(
               hnp.HiddenNumberProblemForCurve(a, b, curve_id,  # pyrefly: ignore[bad-argument-type]
@@ -250,20 +274,25 @@ class CheckCr50U2f(base_check.ECDSASignatureCheck):
       pks = _MapIssuerSigIndexes(sigs)
       guesses = set()
       for _, idxs in pks.items():
-        # Exclude duplicate signatures from the actual processing
-        unique_vals = list({
-            ec_util.ECDSAValues(sigs[idx].ecdsa_sig_info, curve) for idx in idxs
-        })
+        # Exclude duplicate signatures from the actual processing while
+        # preserving signature order for the sliding window.
+        unique_vals = list(
+            dict.fromkeys(
+                ec_util.ECDSAValues(sigs[idx].ecdsa_sig_info, curve)
+                for idx in idxs
+            )
+        )
         # Sliding window. Two signatures are enough to detect this vulnerability
         for i in range(len(unique_vals) - 1):
           r1, s1, z1 = unique_vals[i]
           r2, s2, z2 = unique_vals[i + 1]
           guesses.update(
               cr50_u2f_weakness.Cr50U2fGuesses(r1, s1, z1, r2, s2, z2, curve.n))
-        # Also test a single/last signature, assuming also weak private key
-        r1, s1, z1 = unique_vals[-1]
-        guesses.update(
-            cr50_u2f_weakness.Cr50U2fGuesses(r1, s1, z1, 1, 1, 0, curve.n))
+        # Also test individual signatures, assuming also a weak private key
+        for r1, s1, z1 in unique_vals:
+          guesses.update(
+              cr50_u2f_weakness.Cr50U2fGuesses(r1, s1, z1, 1, 1, 0, curve.n)
+          )
       issuer_dlogs = _IssuerDLogs(list(guesses), pks, curve)
       # Store the test results
       for i, sig in enumerate(sigs):
