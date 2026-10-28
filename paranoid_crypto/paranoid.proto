@@ -16,7 +16,7 @@ syntax = "proto3";
 
 package paranoid_crypto;
 
-// Next ID to use: 17
+// Next ID to use: 19
 enum OriginType {
   ORIGIN_UNKNOWN = 0;
   ORIGIN_OPTION_ROM = 1;
@@ -35,6 +35,8 @@ enum OriginType {
   ORIGIN_ANDROID_MOBILE_HARNESS_EC = 14;
   ORIGIN_ANDROID_DROIDGUARD_RSA = 15;
   ORIGIN_ANDROID_DROIDGUARD_EC = 16;
+  ORIGIN_CCADB_RSA = 17;
+  ORIGIN_CCADB_EC = 18;
 }
 
 // Next ID to use: 19
