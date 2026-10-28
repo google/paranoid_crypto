@@ -96,7 +96,8 @@ enum SeverityType {
 }
 
 message OriginInfo {
-  // The fingerprint (sha256) of the original raw_data.
+  // The fingerprint of the original raw_data (typically sha256, though other
+  // hashes such as sha1 can also be used).
   bytes fingerprint = 1;
   // Raw data where the signature/public key was extracted from (e.g., x509 DER
   // cert.).
