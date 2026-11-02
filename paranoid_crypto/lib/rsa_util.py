@@ -769,3 +769,147 @@ def CheckLowHammingWeight(
         break
   potentially_weak = minv <= threshold_weak
   return potentially_weak, []
+
+
+def CheckHighHammingWeight(
+    n: int, cutoff: int = 2500, maxsteps: int = 10**6
+) -> tuple[bool, list[int]]:
+  """Tries to factor n assuming that the factors have a high Hamming weight.
+
+  This is the dual of CheckLowHammingWeight for RSA moduli whose prime factors
+  have very few 0-bits (e.g., primes generated from a stuck-at-1 hardware RNG
+  or uninitialized 0xFF-erased flash memory, as observed in "Factoring RSA keys
+  from certified smart cards: Coppersmith in the wild").
+
+  Writing p = 2**psize - u and q = 2**psize - v for odd psize-bit primes p <= q
+  maps each interior 0-bit of p and q one-to-one onto an interior 1-bit of u
+  and v without carries (since u = ((2**psize - 1) ^ p) | 1). Tracking ceiling
+  prefixes p0 = 2**(psize - bit) - (u >> bit) and q0 = 2**(psize - bit) -
+  (v >> bit) ensures that runs of 1-bits in p and q shrink the deficit
+  (p0 * q0 << (2 * bit)) - n just as runs of 0-bits shrink the remainder in
+  CheckLowHammingWeight.
+
+  Args:
+      n: the modulus to test
+      cutoff: the number of steps after which the search is abandoned if no
+        promising branch has been found.
+      maxsteps: an upper bound on the maximal number of steps.
+
+  Returns:
+      A tuple (weak, factors), where weak is True if the modulus is (probably)
+      weak, and factors is a list of factors found (empty if only suspected).
+  """
+
+  def Heuristic(zero_weight: int, rem_size: int) -> int:
+    return rem_size + 5 * zero_weight
+
+  n = int(n)
+  if n < 4:
+    return False, []
+
+  psize = (n.bit_length() + 1) // 2
+  # Standard RSA generators set the two most significant bits of p and q to
+  # 0b11, restricting 2**psize - p to (0, 2**(psize - 2)) and increasing the
+  # density near 2**(2 * psize) by 16x (4 bits) compared to 2**(2 * psize - 2).
+  # Shifting the thresholds down by 4 bits from 2 * psize preserves the same
+  # early-cutoff and false-positive margins as CheckLowHammingWeight.
+  threshold_cutoff = 2 * psize - 4
+  threshold_weak = 2 * psize - 16
+
+  neg_n = (1 << (2 * psize)) - n
+  neg_n_limbs = [(neg_n >> (2 * b)) & 3 for b in range(psize)]
+  steps = 0
+  minv = Heuristic(2, neg_n.bit_length())
+  cur_v = minv
+  buckets: list[Optional[list[tuple[int, int, int, int, int]]]] = [None] * (
+      12 * psize + 25
+  )
+  buckets[cur_v] = [(2, psize - 1, 2, 2, neg_n >> (2 * (psize - 1)))]
+  queued = 1
+
+  while steps < maxsteps and queued:
+    steps += 1
+    if steps == cutoff:
+      if minv >= threshold_cutoff:
+        break
+
+    bucket = buckets[cur_v]
+    while not bucket:
+      cur_v += 1
+      bucket = buckets[cur_v]
+    zw, bit, p, q, rem = bucket.pop()
+    queued -= 1
+
+    while bit >= 1:
+      p <<= 1
+      q <<= 1
+      bit -= 1
+      rem = (rem << 2) | neg_n_limbs[bit]
+      if rem < p:
+        if not bit and rem == 0:
+          return True, [p, q]
+        continue
+      bound = p + q - 3
+      base_v = 2 * bit + 5 * zw + 5
+      # du=0, dv=1: p0 = p, q0 = q - 1, p0 * q0 = p * q - p (p0 <= q0 iff p < q)
+      rem0 = rem - p
+      if bit:
+        if rem0 <= bound and p < q:
+          v_new = rem0.bit_length() + base_v
+          target = buckets[v_new]
+          if target is None:
+            buckets[v_new] = [(zw + 1, bit, p, q - 1, rem0)]
+          else:
+            target.append((zw + 1, bit, p, q - 1, rem0))
+          queued += 1
+          if v_new < cur_v:
+            cur_v = v_new
+            if v_new < minv:
+              minv = v_new
+      elif rem0 == 0 and p < q:
+        return True, [p, q - 1]
+
+      # du=1, dv=0: p0 = p - 1, q0 = q, p0 * q0 = p * q - q (always p - 1 < q)
+      rem0 = rem - q
+      if rem0 < 0:
+        continue
+      if bit:
+        if rem0 <= bound:
+          v_new = rem0.bit_length() + base_v
+          target = buckets[v_new]
+          if target is None:
+            buckets[v_new] = [(zw + 1, bit, p - 1, q, rem0)]
+          else:
+            target.append((zw + 1, bit, p - 1, q, rem0))
+          queued += 1
+          if v_new < cur_v:
+            cur_v = v_new
+            if v_new < minv:
+              minv = v_new
+      elif rem0 == 0:
+        return True, [p - 1, q]
+
+      # du=1, dv=1: p0 = p - 1, q0 = q - 1, p0 * q0 = p * q - p - q + 1
+      rem0 = rem0 - p + 1
+      if rem0 < 0:
+        continue
+      if bit:
+        if rem0 <= bound - 1:
+          v_new = rem0.bit_length() + base_v + 5
+          target = buckets[v_new]
+          if target is None:
+            buckets[v_new] = [(zw + 2, bit, p - 1, q - 1, rem0)]
+          else:
+            target.append((zw + 2, bit, p - 1, q - 1, rem0))
+          queued += 1
+          if v_new < cur_v:
+            cur_v = v_new
+            if v_new < minv:
+              minv = v_new
+      elif rem0 == 0:
+        return True, [p - 1, q - 1]
+      # Here rem0 >= 0 means rem >= p + q - 1 > p + q - 2, so (du=0, dv=0) is
+      # out of bounds and the spine terminates.
+      break
+  potentially_weak = minv <= threshold_weak
+  return potentially_weak, []

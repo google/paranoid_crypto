@@ -216,8 +216,7 @@ check passes $d$ to `rsa_util.CheckFraction(n, d)` to factor $n$
 
 ### CheckPollardpm1
 
-Checks whether $n$ can be factored by Pollard's $p - 1$ algorithm (or
-Williams' $p + 1$ algorithm when a smooth factor divides $n - 1$).
+Checks whether $n$ can be factored by Pollard's $p - 1$ algorithm.
 
 A prime $p$ is vulnerable to Pollard's $p - 1$ method if $p - 1$ is
 powersmooth, meaning it is a product of small primes and prime powers dividing a
@@ -240,12 +239,6 @@ When this filter triggers:
     $b = a^{m_{\text{odd}}} \bmod n$, and repeatedly squares $b$ while
     checking $\gcd(b - 1, n)$ to split $p$ and $q$ whenever the 2-adic
     valuations of the orders of $a$ modulo $p$ and $q$ differ.
-3.  **Williams $p + 1$ Lucas step when $g = 1$:** Because
-    $n - 1 = p q - 1 = (p + 1)(q + 1) - (p + q)$, a large smooth factor in
-    $\gcd(n - 1, m)$ can also arise when $p + 1$ and $q + 1$ share smooth
-    factors. When $g = 1$, the check evaluates the Lucas sequence
-    $V_m(5, 1) \bmod n$ and tests $\gcd(V_m - 2, n)$ to recover factors
-    vulnerable to Williams' $p + 1$ method.
 
 Keys failing this check are flagged with `SEVERITY_CRITICAL`.
 
@@ -272,6 +265,40 @@ steps. If a promising branch is found, the search continues up to
     partial factorization with heuristic value
     $\le \text{bit_length}(n) - 12$, the key is flagged as potentially weak
     with `SEVERITY_UNKNOWN`.
+
+### CheckHighHammingWeight
+
+Checks whether $n = p \cdot q$ is a product of primes with abnormally high
+Hamming weight (dense binary representations with very few zero bits, such as
+primes drawn from a saturated stuck-at-1 hardware RNG or `0xFF`-erased flash
+memory, as observed in [SmartFacts]).
+
+For odd $k$-bit primes $p \le q$ (where
+$k = \lfloor (\text{bit_length}(n) + 1) / 2 \rfloor$), writing
+$p = 2^k - u$ and $q = 2^k - v$ maps each interior zero bit of $p$ and
+$q$ one-to-one onto an interior one bit of $u$ and $v$ without carries.
+The check performs a best-first Dial bucket search from the most significant
+bits down to the least significant bits over ceiling prefixes
+$p_0 = 2^{k - b} - \lfloor u / 2^b \rfloor$ and
+$q_0 = 2^{k - b} - \lfloor v / 2^b \rfloor$ with $b$ remaining bits and
+combined zero-bit weight $\text{zw}$, prioritized by the deficit heuristic
+
+$$
+h(p_0, q_0) = \text{bit_length}(\lfloor (p_0 q_0 2^{2b} - n) / 2^{2b} \rfloor)
++ 2b + 5 \cdot \text{zw}.
+$$
+
+Because standard RSA generators set the two most significant bits of $p$ and
+$q$ to `0b11`, random keys concentrate $16\times$ (4 bits) closer to
+$2^{2k}$ than to $2^{2k - 2}$. Accordingly, the search terminates after
+`cutoff = 2500` steps unless the minimum heuristic value drops below
+$2k - 4$, and otherwise continues up to `maxsteps = 10^6` steps:
+
+*   If the exact factors $p$ and $q$ are found, the key is flagged with
+    `SEVERITY_CRITICAL`.
+*   If the search reaches `maxsteps` without factoring $n$ but discovers a
+    partial prefix with heuristic value $\le 2k - 16$, the key is flagged as
+    potentially weak with `SEVERITY_UNKNOWN`.
 
 ### CheckUnseededRand
 

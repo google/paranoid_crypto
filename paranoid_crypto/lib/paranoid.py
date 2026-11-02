@@ -52,6 +52,7 @@ _ACTIVE_RSA_SINGLE_CHECKS = (
     rsa_single_checks.CheckPermutedBitPatterns,
     rsa_single_checks.CheckPollardpm1,
     rsa_single_checks.CheckLowHammingWeight,
+    rsa_single_checks.CheckHighHammingWeight,
     rsa_single_checks.CheckUnseededRand,
     rsa_single_checks.CheckSmallUpperDifferences,
     rsa_single_checks.CheckKeypairDenylist,

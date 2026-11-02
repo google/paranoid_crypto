@@ -494,6 +494,39 @@ class CheckLowHammingWeight(base_check.RSAKeyCheck):
     return any_weak
 
 
+class CheckHighHammingWeight(base_check.RSAKeyCheck):
+  """Runs checks for keys that are products of high Hamming weight primes."""
+
+  def __init__(self):
+    super().__init__(paranoid_pb2.SeverityType.SEVERITY_CRITICAL)
+
+  def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
+    any_weak = False
+    for key in artifacts:
+      test_result = self._CreateTestResult()
+      n = gmpy.mpz(util.Bytes2Int(key.rsa_info.n))
+      weak, factors = rsa_util.CheckHighHammingWeight(n)
+      if weak:
+        if factors:
+          logging.warning(
+              "Key factored! Factors: %s\n%s", factors, key.rsa_info
+          )
+          util.AttachFactors(key.test_info, consts.INFO_NAME_N_FACTORS, factors)
+        else:
+          logging.warning(
+              "Key may be product of high Hamming weight primes:\n%s",
+              key.rsa_info,
+          )
+          # To distinguish between keys where the factorization was found and
+          # keys where a product of high Hamming weight primes is only suspected
+          # we use SEVERITY_UNKNOWN for the latter.
+          test_result.severity = paranoid_pb2.SeverityType.SEVERITY_UNKNOWN
+        any_weak = True
+        test_result.result = True
+      util.SetTestResult(key.test_info, test_result)
+    return any_weak
+
+
 class CheckUnseededRand(base_check.RSAKeyCheck):
   """Checks if the RSA keys were generated with unseeded PRNGs."""
 
