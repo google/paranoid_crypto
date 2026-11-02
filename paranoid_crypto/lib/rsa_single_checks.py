@@ -25,6 +25,7 @@ from paranoid_crypto.lib import keypair_generator
 from paranoid_crypto.lib import ntheory_util
 from paranoid_crypto.lib import roca
 from paranoid_crypto.lib import rsa_util
+from paranoid_crypto.lib import short_sleeve
 from paranoid_crypto.lib import special_case_factoring
 from paranoid_crypto.lib import util
 from paranoid_crypto.lib.data import default_storage
@@ -594,5 +595,26 @@ class CheckKeypairDenylist(base_check.RSAKeyCheck):
           util.AttachFactors(key.test_info, consts.INFO_NAME_N_FACTORS, (p, q))
           any_weak = True
           test_result.result = True
+      util.SetTestResult(key.test_info, test_result)
+    return any_weak
+
+
+class CheckShortSleeve(base_check.RSAKeyCheck):
+  """Factors Short-Sleeve RSA keys with low-entropy big-integer limbs."""
+
+  def __init__(self):
+    super().__init__(paranoid_pb2.SeverityType.SEVERITY_CRITICAL)
+
+  def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
+    any_weak = False
+    for key in artifacts:
+      test_result = self._CreateTestResult()
+      n = gmpy.mpz(util.Bytes2Int(key.rsa_info.n))
+      factors = short_sleeve.factor_short_sleeve(n)
+      if factors:
+        logging.warning("Key factored! Factors: %s\n%s", factors, key.rsa_info)
+        util.AttachFactors(key.test_info, consts.INFO_NAME_N_FACTORS, factors)
+        any_weak = True
+        test_result.result = True
       util.SetTestResult(key.test_info, test_result)
     return any_weak

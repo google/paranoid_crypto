@@ -329,6 +329,39 @@ significant bits of $n$, the check reconstructs the 32-byte seed, regenerates
 $(p, q)$, and verifies whether $p \cdot q = n$ (detecting approximately
 90.6% of vulnerable keys with `SEVERITY_CRITICAL`).
 
+### CheckShortSleeve
+
+Detects and factors "Short-Sleeve" RSA moduli ([ShortSleeve], [CompleteFTP]
+CVE-2026-32648), which arise when a faulty big-integer prime generator populates
+each $w$-bit limb of $p$ and $q$ with only $b \ll w$ bits of entropy
+(either zero-padded unsigned limbs or sign-extended signed limbs such as C#
+`sbyte` to `uint` conversion).
+
+When $b$ is small enough that limb products do not overflow $2^{w - 1}$
+after aligning the sleeve boundary by a bit shift $s \in [0, w)$, the shifted
+multiple $2^s \cdot n = P(2^w) \cdot Q(2^w)$ embeds the exact product of two
+univariate integer polynomials $P(x)$ and $Q(x)$ in balanced base $2^w$:
+
+$$2^s \cdot n = \sum_{i=0}^{d} c_i 2^{i w}, \quad |c_i| \le 2^{w - 1}.$$
+
+To run across large key corpora with microsecond overhead per normal key,
+`short_sleeve.factor_short_sleeve` operates in two stages:
+
+1.  **Bitwise Limb-Transition Prefilter:** Computing $x = n \oplus (n \gg 1)$
+    converts both `00...0` zero runs and `11...1` sign-extension runs into
+    `00...0`. For each candidate limb width $w \in \{16, 32, 64, 128, 256\}$,
+    interior $w$-bit limbs from both halves of $x$ are folded via bitwise OR
+    in $O(\log m)$ shifts and tested for a circular run of zeros with false
+    trigger probability $\approx 2^{-36}$.
+2.  **Polynomial Factorization in $\mathbb{Z}[x]$:** For candidate alignment
+    shifts $s$, `ntheory_util.BalancedDigits` extracts the balanced
+    base-$2^w$ polynomial $f(x)$ and `poly_util.factor_zz_poly` factors it
+    over $\mathbb{Z}[x]$ using SymPy's finite-field factorization and
+    quadratic Hensel lifting, combined with van Hoeij's truncated-trace lattice
+    reduced with `fpylll` LLL when the modular factor count is large. Evaluating
+    candidate factors at $x = 2^w$ and taking $\gcd(|P(2^w)|, n)$ recovers
+    $p$ and $q$ (`SEVERITY_CRITICAL`).
+
 ## Aggregate Checks
 
 ### CheckGCD
@@ -363,8 +396,10 @@ negligible. This heuristic check (`SEVERITY_UNKNOWN`) is designed to surface:
 
 <!-- Literature -->
 
+[CompleteFTP]: https://enterprisedt.com/products/completeftp/doc/guide/html/release_notes.html "CompleteFTP BigInteger RSA key generation vulnerability (CVE-2026-32648)"
 [Keypair]: https://securitylab.github.com/advisories/GHSL-2021-1012-keypair/ "GHSL-2021-1012: Predictable RSA key generation in Keypair (CVE-2021-41117)"
 [MiningPsAndQs]: https://www.usenix.org/conference/usenixsecurity12/technical-sessions/presentation/heninger "N. Heninger, Z. Durumeric, E. Wustrow, J. A. Halderman, Mining Your Ps and Qs: Detection of Widespread Weak Keys in Network Devices"
 [ROCA]: https://crocs.fi.muni.cz/public/papers/rsa_ccs17 "M. Nemec, M. Sys, P. Svenda, D. Klinec, V. Matyas, The Return of Coppersmith's Attack: Practical Factorization of Widely Used RSA Moduli"
 [RonWasWrong]: https://eprint.iacr.org/2012/064 "A. K. Lenstra, J. P. Hughes, M. Augier, J. W. Bos, T. Kleinjung, C. Wachter, Ron was wrong, Whit is right"
+[ShortSleeve]: https://blog.trailofbits.com/2024/08/21/short-sleeve-rsa-factoring-custom-rsa-implementations-with-polynomials/ "G. Gutoski, S. Railton, Short-sleeve RSA: Factoring custom RSA implementations with polynomials"
 [SmartFacts]: https://eprint.iacr.org/2013/599 "D. J. Bernstein, Y.-A. Chang, C.-M. Cheng, L.-P. Chou, N. Heninger, T. Lange, N. van Someren, Factoring RSA keys from certified smart cards: Coppersmith in the wild"

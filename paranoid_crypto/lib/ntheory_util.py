@@ -201,6 +201,36 @@ def DivmodRounded(a: int, b: int) -> tuple[int, int]:
   return x, y - d
 
 
+def BalancedDigits(n: int, word_bits: int) -> list[int]:
+  """Decomposes n into balanced base-2**word_bits digits (LSB first).
+
+  Computes digits c_0, c_1, ..., c_k in [-2**(word_bits - 1), 2**(word_bits - 1)
+  - 1] such that sum(c_i * 2**(i * word_bits)) == n, with c_k != 0 when n != 0.
+
+  Args:
+    n: Integer to decompose (positive, negative, or zero).
+    word_bits: Bit width w >= 2 of each balanced digit.
+
+  Returns:
+    List of balanced integer digits from least significant to most significant,
+    or [] when n == 0.
+  """
+  if word_bits < 2:
+    raise ValueError("word_bits must be >= 2")
+  cur = gmpy.mpz(n)
+  base = 1 << word_bits
+  half = 1 << (word_bits - 1)
+  mask = (gmpy.mpz(1) << word_bits) - 1
+  digits: list[int] = []
+  while cur != 0:
+    rem = int(cur & mask)
+    if rem >= half:
+      rem -= base
+    digits.append(rem)
+    cur = (cur - rem) >> word_bits
+  return digits
+
+
 def Sieve(n: int) -> list[int]:
   """Using Sieve of Eratosthenes, returns all primes lower than n."""
   if n <= 2:

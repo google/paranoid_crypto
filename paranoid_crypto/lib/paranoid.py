@@ -55,6 +55,7 @@ _ACTIVE_RSA_SINGLE_CHECKS = (
     rsa_single_checks.CheckUnseededRand,
     rsa_single_checks.CheckSmallUpperDifferences,
     rsa_single_checks.CheckKeypairDenylist,
+    rsa_single_checks.CheckShortSleeve,
 )
 
 _ACTIVE_RSA_AGGREGATE_CHECKS = (
