@@ -588,21 +588,6 @@ def Pollardpm1(
           return True, [g, n // g]
         b = (b * b) % n
       return True, []
-    # When gcd(n - 1, m) >= gcd_bound but p == 1, the smooth shared factor in
-    # n - 1 = p * q - 1 may divide p + 1 and q + 1 (Williams p+1 smoothness).
-    if m and m > 0:
-      v0 = gmpy.mpz(5)
-      v1 = gmpy.mpz(23) % n
-      for bit in bin(m)[3:]:
-        if bit == "1":
-          v0 = (v0 * v1 - 5) % n
-          v1 = (v1 * v1 - 2) % n
-        else:
-          v1 = (v0 * v1 - 5) % n
-          v0 = (v0 * v0 - 2) % n
-      p = gmpy.gcd(v0 - 2, n)
-      if 1 < p < n:
-        return True, [p, n // p]
   return False, []
 
 
