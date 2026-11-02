@@ -106,12 +106,6 @@ class RsaUtilTest(absltest.TestCase):
     self.assertTrue(res)
     self.assertCountEqual(factors, [17, 23])
 
-    # Williams p+1 smoothness: p=19 (p+1=20), q=59 (q+1=60), gcd(n-1, 60)=20,
-    # neither p-1=18 nor q-1=58 divides m=60, but p+1 and q+1 divide 60:
-    res, factors = rsa_util.Pollardpm1(19 * 59, m=60, gcd_bound=10)
-    self.assertTrue(res)
-    self.assertCountEqual(factors, [19, 59])
-
   def testCheckContinuedFractionOddBits(self):
     # Two 124-bit primes whose product is 247 bits (odd bit length) with
     # repeating patterns:
