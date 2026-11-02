@@ -213,6 +213,20 @@ bad_rsa_keypair3.rsa_info.n = util.Hex2Bytes(
 )
 bad_rsa_keys_keypair = [bad_rsa_keypair1, bad_rsa_keypair2, bad_rsa_keypair3]
 
+# Has keys generated with Short-Sleeve low-entropy limbs (w=128 shifted high
+# sleeve and w=32 signed sbyte sleeve, e.g., CVE-2026-32648):
+bad_rsa_short_sleeve1 = paranoid_pb2.RSAKey()
+bad_rsa_short_sleeve1.rsa_info.e = util.Hex2Bytes('010001')
+bad_rsa_short_sleeve1.rsa_info.n = util.Hex2Bytes(
+    'c71a5a236f029f8200000000000000011366678deaa166b900000000000000010dfc5a95bf2e5836000000000000000175cbcaf47d2420c6000000000000000144aa81ed62ab48ac0000000000000000e331efcca8a97bac00000000000000023ee7117bfbe2b42600000000000000029e9d94bae7f6eba400000000000002c237af4077e6a910b900000000000001610dfbf72596e3e03700000000000001ac972a17b48a2b29a2000000000000021fd1c74875300ec69b000000000000004728cd88b4c5183e4b00000000000000b4cd276000f461a7d5000000000000027b56861238751d3f5a000000000000026b97c91e31000000000000000000013ddf'
+)
+bad_rsa_short_sleeve2 = paranoid_pb2.RSAKey()
+bad_rsa_short_sleeve2.rsa_info.e = util.Hex2Bytes('010001')
+bad_rsa_short_sleeve2.rsa_info.n = util.Hex2Bytes(
+    '9000005f400006e4c00032f93fffd78f8000607abfff8954c0008c39c0001444ffffe570800033727fffd50dfffffb93bfffecc3bfff35417fffbfcf7fffc64cbfffbaa2ffff3e1d7fff920e3fff91317ffffd27bfff394f3fffb2d200001ba6ffff4ef5bfff5a44c00005473fffa894bffff875bfff17088000875a7fff82608000beb70000e8a2ffffc0ca00013f2fffff45d90002785200009cf9000035230000b5f10000a76d0001815bfffe6469ffffe362000134ec000067f700000a2cffff9c89000071f7ffff07b0fffffc970001335700016a59fffe56340000f679ffffb73affff2bf5ffffa4a5fffe5ce1ffff3340ffff2b830000711200036955'
+)
+bad_rsa_keys_short_sleeve = [bad_rsa_short_sleeve1, bad_rsa_short_sleeve2]
+
 good_and_bad_rsa_keys = good_rsa_keys + bad_rsa_keys_size_exp
 
 
@@ -373,6 +387,12 @@ class ParanoidRSATest(paranoid_base_test.ParanoidBaseTest):
     self.assertTrue(check.Check(bad_rsa_keys_keypair))
     self.assertResults(bad_rsa_keys_keypair, check.check_name, True)
     self.assertFactors(bad_rsa_keys_keypair)
+
+  def testCheckShortSleeve(self):
+    check = rsa_single_checks.CheckShortSleeve()
+    self.assertTrue(check.Check(bad_rsa_keys_short_sleeve))
+    self.assertResults(bad_rsa_keys_short_sleeve, check.check_name, True)
+    self.assertFactors(bad_rsa_keys_short_sleeve)
 
   def testCheckAllRSA(self):
     self.assertFalse(paranoid.CheckAllRSA(good_rsa_keys))

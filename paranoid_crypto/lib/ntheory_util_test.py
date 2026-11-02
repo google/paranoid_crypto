@@ -55,6 +55,29 @@ class NTheoryUtilTest(absltest.TestCase):
     self.assertEqual(ntheory_util.Sieve(4), [2, 3])
     self.assertEqual(ntheory_util.Sieve(5), [2, 3])
 
+  def testBalancedDigits(self):
+    self.assertEqual(ntheory_util.BalancedDigits(0, 8), [])
+    self.assertEqual(ntheory_util.BalancedDigits(1, 4), [1])
+    self.assertEqual(ntheory_util.BalancedDigits(-1, 4), [-1])
+    self.assertEqual(ntheory_util.BalancedDigits(8, 4), [-8, 1])
+    self.assertEqual(ntheory_util.BalancedDigits(-8, 4), [-8])
+    with self.assertRaises(ValueError):
+      ntheory_util.BalancedDigits(5, 1)
+
+    rng = random.Random(12345)
+    for w in (2, 3, 8, 16, 32, 64, 128):
+      half = 1 << (w - 1)
+      for sign in (1, -1):
+        val = sign * rng.getrandbits(512)
+        digits = ntheory_util.BalancedDigits(val, w)
+        if val != 0:
+          self.assertNotEqual(digits[-1], 0)
+        for d in digits:
+          self.assertGreaterEqual(d, -half)
+          self.assertLess(d, half)
+        reconstructed = sum(d << (i * w) for i, d in enumerate(digits))
+        self.assertEqual(reconstructed, val)
+
 
 if __name__ == '__main__':
   absltest.main()
