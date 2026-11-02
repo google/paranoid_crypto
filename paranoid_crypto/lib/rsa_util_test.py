@@ -126,6 +126,39 @@ class RsaUtilTest(absltest.TestCase):
     self.assertIsNotNone(factors)
     self.assertCountEqual(factors, [p, q])
 
+  def testCheckHighHammingWeight(self):
+    # Tiny edge cases below 4 should return (False, []) cleanly.
+    for small_n in (0, 1, 2, 3):
+      self.assertEqual(rsa_util.CheckHighHammingWeight(small_n), (False, []))
+
+    # Mersenne square (zero interior 0-bits).
+    weak, factors = rsa_util.CheckHighHammingWeight(127 * 127)
+    self.assertTrue(weak)
+    self.assertCountEqual(factors, [127, 127])
+
+    # 1024-bit modulus whose 512-bit primes each have 32 interior 0-bits.
+    rng = random.Random(12345)
+    p = (1 << 512) - 1
+    for z in rng.sample(range(1, 510), 32):
+      p ^= 1 << z
+    while not gmpy.is_prime(p):
+      p -= 2
+    q = (1 << 512) - 1
+    for z in rng.sample(range(1, 510), 32):
+      q ^= 1 << z
+    while not gmpy.is_prime(q):
+      q -= 2
+    weak, factors = rsa_util.CheckHighHammingWeight(p * q)
+    self.assertTrue(weak)
+    self.assertCountEqual(factors, [p, q])
+
+    # Normal random 2048-bit modulus should not be flagged.
+    p_rand = int(gmpy.next_prime(rng.getrandbits(1024) | (3 << 1022)))
+    q_rand = int(gmpy.next_prime(rng.getrandbits(1024) | (3 << 1022)))
+    self.assertEqual(
+        rsa_util.CheckHighHammingWeight(p_rand * q_rand), (False, [])
+    )
+
 
 if __name__ == '__main__':
   absltest.main()

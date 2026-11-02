@@ -195,6 +195,24 @@ bad_rsa_low_hamming_weight_upper.rsa_info.n = util.Hex2Bytes(
 )
 bad_rsa_keys_low_hamming_weight_upper = [bad_rsa_low_hamming_weight_upper]
 
+# Has a key where p and q are 1024-bit primes with a Hamming weight of 960
+# (64 zero bits).
+bad_rsa_high_hamming_weight = paranoid_pb2.RSAKey()
+bad_rsa_high_hamming_weight.rsa_info.e = util.Hex2Bytes('010001')
+bad_rsa_high_hamming_weight.rsa_info.n = util.Hex2Bytes(
+    'fffbddb079409f688498119e25c4d45fb5eda7760a974cc1240f0a710a4a91c4aad46f05c723e394bcad2cb69ac3054cd54257e9893bc7224d773bbbc2b1634d80e419863fa0f58785f7ddb7992f40b2211050a21f1c45d2e3d9aaa2a692a6826218e30782c959ce684bbe1f9d257c6b0304ef2e1235221a2e44c358109bd848cfab6a3b61d0cdb1d531b022d514399750fd74115ef02ad5c166223d0a88227b286db2d6077c4f096c51c7828b969359352077fd91e7b7be3d9b85d253ee66c551dffccba638d078245b18007cd9d024d6d00c351acfe5f8f706acb8737154880b39e18e0324ca5d311cab5d4b70c3310f204899ea22235062548354029007d9'
+)
+bad_rsa_keys_high_hamming_weight = [bad_rsa_high_hamming_weight]
+
+# Has a key where the upper 768 bits of p and q have a Hamming weight of 720
+# (48 zero bits). The lower 256 bits are unbiased.
+bad_rsa_high_hamming_weight_upper = paranoid_pb2.RSAKey()
+bad_rsa_high_hamming_weight_upper.rsa_info.e = util.Hex2Bytes('010001')
+bad_rsa_high_hamming_weight_upper.rsa_info.n = util.Hex2Bytes(
+    'feff7fff5feb907a9a87ff2418a451fffd94aaf060835924693514933f12239252998bcb9723cf1c33f4f04a5da2a21a98ba878f4ce1927ea4dd41522a50bc841f144f8dad320369fd152e6994a60ed7fa98214b4b71f613513fa21522b45e4d82982befe0aa54f1434f6c37ab93e785adeb6da81acbaac249ad237da4400e806bf9d510b38d4d5e29e223e926e5c5f7fd76f718446e72e3d797a3be0bc29a9e12599ca5d64c645c13978f675494fba9d7db835ed3327519ca983e4595493133cb811bff3ba247136bcf0947437e38ef05f4ba5d1ba920575c53fdefab6e58cca3f8126d53b3c725fd2f95d36763da8dee0d20a1183939c2b65f7ac1271fc463'
+)
+bad_rsa_keys_high_hamming_weight_upper = [bad_rsa_high_hamming_weight_upper]
+
 # Has keys of sizes 2048, 3072 and 4096, vulnerable to CVE-2021-41117
 bad_rsa_keypair1 = paranoid_pb2.RSAKey()
 bad_rsa_keypair1.rsa_info.e = util.Hex2Bytes('010001')
@@ -381,6 +399,24 @@ class ParanoidRSATest(paranoid_base_test.ParanoidBaseTest):
     self.assertSeverities(bad_rsa_keys_low_hamming_weight_upper,
                           check.check_name,
                           paranoid_pb2.SeverityType.SEVERITY_UNKNOWN)
+
+  def testCheckHighHammingWeight(self):
+    check = rsa_single_checks.CheckHighHammingWeight()
+    self.assertTrue(check.Check(bad_rsa_keys_high_hamming_weight))
+    self.assertResults(bad_rsa_keys_high_hamming_weight, check.check_name, True)
+    self.assertFactors(bad_rsa_keys_high_hamming_weight)
+
+  def testCheckHighHammingWeightUpper(self):
+    check = rsa_single_checks.CheckHighHammingWeight()
+    self.assertTrue(check.Check(bad_rsa_keys_high_hamming_weight_upper))
+    self.assertResults(
+        bad_rsa_keys_high_hamming_weight_upper, check.check_name, True
+    )
+    self.assertSeverities(
+        bad_rsa_keys_high_hamming_weight_upper,
+        check.check_name,
+        paranoid_pb2.SeverityType.SEVERITY_UNKNOWN,
+    )
 
   def testCheckKeypairDenylist(self):
     check = rsa_single_checks.CheckKeypairDenylist()
