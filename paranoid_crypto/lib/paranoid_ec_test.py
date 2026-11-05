@@ -13,11 +13,16 @@
 # limitations under the License.
 """EC Tests for paranoid_crypto.lib.paranoid."""
 
+import hashlib
+import hmac
+import random
 from absl.testing import absltest
 from paranoid_crypto import paranoid_pb2
+from paranoid_crypto.lib import ec_util
 from paranoid_crypto.lib import paranoid
 from paranoid_crypto.lib import paranoid_base_test
 from paranoid_crypto.lib import util
+from paranoid_crypto.lib.data import debian_openssl_generator
 from paranoid_crypto.lib.paranoid import ec_aggregate_checks
 from paranoid_crypto.lib.paranoid import ec_single_checks
 
@@ -172,6 +177,20 @@ good_and_bad_ec_keys = [good_ec_key_secp256r1, bad_ec_key_invalid]
 ec_aggregate_checks.CheckECKeySmallDifference.__init__.__defaults__ = (2**8,)
 
 
+def _MakeECKeyFromPrivate(
+    curve_type: paranoid_pb2.CurveType, d: int
+) -> paranoid_pb2.ECKey:
+  curve = ec_util.CURVE_FACTORY[curve_type]
+  assert curve is not None
+  x, y = curve.Multiply(curve.g, d)
+  assert x is not None and y is not None
+  key = paranoid_pb2.ECKey()
+  key.ec_info.curve_type = curve_type
+  key.ec_info.x = util.Int2Bytes(int(x))
+  key.ec_info.y = util.Int2Bytes(int(y))
+  return key
+
+
 class ParanoidECTest(paranoid_base_test.ParanoidBaseTest):
 
   def testCheckValidECKey(self):
@@ -188,7 +207,200 @@ class ParanoidECTest(paranoid_base_test.ParanoidBaseTest):
     check = ec_single_checks.CheckWeakECPrivateKey()
     self.assertTrue(check.Check(ec_keys_weak_private))
     self.assertResults(ec_keys_weak_private, check.check_name, True)
-    # TODO(pedroysb): Create assertDLogs method and call it here.
+    self.assertDLogs(ec_keys_weak_private)
+
+  def testCheckOpensslDenylistEC(self):
+    check = ec_single_checks.CheckOpensslDenylistEC()
+    openssl_curves = (
+        paranoid_pb2.CurveType.CURVE_SECP256R1,
+        paranoid_pb2.CurveType.CURVE_SECP384R1,
+        paranoid_pb2.CurveType.CURVE_SECP521R1,
+    )
+    weak_keys = []
+    # Cover all 3 default NIST prime curves and all 12 architecture/seeding
+    # configs.
+    for idx in range(len(debian_openssl_generator.CONFIGS)):
+      curve_type = openssl_curves[idx % len(openssl_curves)]
+      curve = ec_util.CURVE_FACTORY[curve_type]
+      assert curve is not None
+      for pid in (0, 1, 12345, 32767) if idx < 3 else (42,):
+        d = debian_openssl_generator.generate_ec_private_key(
+            idx, pid, int(curve.n)
+        )
+        weak_keys.append(_MakeECKeyFromPrivate(curve_type, d))
+
+    self.assertTrue(check.Check(weak_keys))
+    self.assertResults(weak_keys, check.check_name, True)
+    self.assertSeverities(
+        weak_keys,
+        check.check_name,
+        paranoid_pb2.SeverityType.SEVERITY_CRITICAL,
+    )
+    self.assertDLogs(weak_keys)
+
+    # Zero-FP verification: points colliding in the lower 32 bits of x (both a
+    # valid negated curve point -P = (x, p - y) and a perturbed x' with the same
+    # 32-bit suffix) must not be flagged.
+    p256 = ec_util.CURVE_FACTORY[paranoid_pb2.CurveType.CURVE_SECP256R1]
+    assert p256 is not None
+    d_denylisted = debian_openssl_generator.generate_ec_private_key(
+        0, 1, int(p256.n)
+    )
+    x_deny, y_deny = p256.Multiply(p256.g, d_denylisted)
+    assert x_deny is not None and y_deny is not None
+    negated_key = paranoid_pb2.ECKey()
+    negated_key.ec_info.curve_type = paranoid_pb2.CurveType.CURVE_SECP256R1
+    negated_key.ec_info.x = util.Int2Bytes(int(x_deny))
+    negated_key.ec_info.y = util.Int2Bytes(int(p256.mod - y_deny))
+
+    colliding_x_key = paranoid_pb2.ECKey()
+    colliding_x_key.ec_info.curve_type = paranoid_pb2.CurveType.CURVE_SECP256R1
+    colliding_x_key.ec_info.x = util.Int2Bytes(int(x_deny) ^ (1 << 40))
+    colliding_x_key.ec_info.y = util.Int2Bytes(int(y_deny))
+
+    non_weak = [negated_key, colliding_x_key]
+    self.assertFalse(check.Check(non_weak))
+    self.assertResults(non_weak, check.check_name, False)
+
+  def testCheckUnseededRandEC(self):
+    check = ec_single_checks.CheckUnseededRandEC()
+
+    p256 = ec_util.CURVE_FACTORY[paranoid_pb2.CurveType.CURVE_SECP256R1]
+    p384 = ec_util.CURVE_FACTORY[paranoid_pb2.CurveType.CURVE_SECP384R1]
+    p521 = ec_util.CURVE_FACTORY[paranoid_pb2.CurveType.CURVE_SECP521R1]
+    assert p256 is not None and p384 is not None and p521 is not None
+
+    # 1. GMP unseeded mpz_urandomb(256) and Java java.util.Random(0)
+    # BigInteger(256, rand).
+    gmp_unseeded_256 = int(
+        '6580d17dd84a873b14b9c0e1680bbdc87647f3c382902d2f58d2754b39bca874', 16
+    )
+    key_gmp_p256 = _MakeECKeyFromPrivate(
+        paranoid_pb2.CurveType.CURVE_SECP256R1,
+        gmp_unseeded_256 % int(p256.n),
+    )
+
+    java_seed = 0 ^ 0x5DEECE66D
+    java_bytes = bytearray()
+    for _ in range(8):
+      java_seed = (java_seed * 0x5DEECE66D + 0xB) & ((1 << 48) - 1)
+      rnd_int = java_seed >> 16
+      for _ in range(4):
+        java_bytes.append(rnd_int & 0xFF)
+        rnd_int >>= 8
+    d_java = util.Bytes2Int(bytes(java_bytes))
+    key_java_p256 = _MakeECKeyFromPrivate(
+        paranoid_pb2.CurveType.CURVE_SECP256R1, d_java % int(p256.n)
+    )
+
+    # 2. Python random.Random(0) randrange(1, n).
+    py_rng = random.Random()
+    py_rng.seed(0, version=2)
+    key_py_p384 = _MakeECKeyFromPrivate(
+        paranoid_pb2.CurveType.CURVE_SECP384R1,
+        py_rng.randrange(1, int(p384.n)),
+    )
+
+    # 3. C++11 default-constructed std::mt19937 (default seed 5489), first 8
+    # uint32 outputs packed MSB-first.
+    mt = [0] * 624
+    mt[0] = 5489
+    for i in range(1, 624):
+      mt[i] = (1812433253 * (mt[i - 1] ^ (mt[i - 1] >> 30)) + i) & 0xFFFFFFFF
+    for i in range(624):
+      y = (mt[i] & 0x80000000) | (mt[(i + 1) % 624] & 0x7FFFFFFF)
+      mt[i] = mt[(i + 397) % 624] ^ (y >> 1)
+      if y & 1:
+        mt[i] ^= 0x9908B0DF
+    d_cpp = 0
+    for i in range(8):
+      y = mt[i]
+      y ^= y >> 11
+      y ^= (y << 7) & 0x9D2C5680
+      y ^= (y << 15) & 0xEFC60000
+      y ^= y >> 18
+      d_cpp = (d_cpp << 32) | (y & 0xFFFFFFFF)
+    key_cpp_p256 = _MakeECKeyFromPrivate(
+        paranoid_pb2.CurveType.CURVE_SECP256R1, d_cpp % int(p256.n)
+    )
+
+    # 4. Zero/empty seed hash, SHAKE-256, BIP-32, and repeated-byte scalars
+    # across secp256r1, secp384r1, and secp521r1.
+    key_sha256_empty_p256 = _MakeECKeyFromPrivate(
+        paranoid_pb2.CurveType.CURVE_SECP256R1,
+        util.Bytes2Int(hashlib.sha256(b'').digest()) % int(p256.n),
+    )
+    key_sha256_zero32 = _MakeECKeyFromPrivate(
+        paranoid_pb2.CurveType.CURVE_SECP256R1,
+        util.Bytes2Int(hashlib.sha256(b'\x00' * 32).digest()) % int(p256.n),
+    )
+    key_sha384_zero48 = _MakeECKeyFromPrivate(
+        paranoid_pb2.CurveType.CURVE_SECP384R1,
+        util.Bytes2Int(hashlib.sha384(b'\x00' * 48).digest()) % int(p384.n),
+    )
+    key_sha512_zero64 = _MakeECKeyFromPrivate(
+        paranoid_pb2.CurveType.CURVE_SECP521R1,
+        util.Bytes2Int(hashlib.sha512(b'\x00' * 64).digest()) % int(p521.n),
+    )
+    key_shake_p521 = _MakeECKeyFromPrivate(
+        paranoid_pb2.CurveType.CURVE_SECP521R1,
+        util.Bytes2Int(hashlib.shake_256(b'').digest(66)) % int(p521.n),
+    )
+    key_bip32_zero = _MakeECKeyFromPrivate(
+        paranoid_pb2.CurveType.CURVE_SECP256R1,
+        util.Bytes2Int(
+            hmac.new(b'Nist256p1 seed', b'\x00' * 32, hashlib.sha512).digest()[
+                :32
+            ]
+        )
+        % int(p256.n),
+    )
+    key_repeat_byte = _MakeECKeyFromPrivate(
+        paranoid_pb2.CurveType.CURVE_SECP256R1,
+        util.Bytes2Int(b'\x42' * 32) % int(p256.n),
+    )
+
+    weak_keys = [
+        key_gmp_p256,
+        key_java_p256,
+        key_py_p384,
+        key_cpp_p256,
+        key_sha256_empty_p256,
+        key_sha256_zero32,
+        key_sha384_zero48,
+        key_sha512_zero64,
+        key_shake_p521,
+        key_bip32_zero,
+        key_repeat_byte,
+    ]
+    self.assertTrue(check.Check(weak_keys))
+    self.assertResults(weak_keys, check.check_name, True)
+    self.assertSeverities(
+        weak_keys,
+        check.check_name,
+        paranoid_pb2.SeverityType.SEVERITY_CRITICAL,
+    )
+    self.assertDLogs(weak_keys)
+
+    # Zero-FP verification: points colliding in the lower 64 bits of x must not
+    # be flagged if d * G != P.
+    x_weak = util.Bytes2Int(key_sha256_empty_p256.ec_info.x)
+    y_weak = util.Bytes2Int(key_sha256_empty_p256.ec_info.y)
+    negated_key = paranoid_pb2.ECKey()
+    negated_key.ec_info.curve_type = paranoid_pb2.CurveType.CURVE_SECP256R1
+    negated_key.ec_info.x = util.Int2Bytes(x_weak)
+    negated_key.ec_info.y = util.Int2Bytes(int(p256.mod) - y_weak)
+
+    colliding_x64_key = paranoid_pb2.ECKey()
+    colliding_x64_key.ec_info.curve_type = (
+        paranoid_pb2.CurveType.CURVE_SECP256R1
+    )
+    colliding_x64_key.ec_info.x = util.Int2Bytes(x_weak ^ (1 << 80))
+    colliding_x64_key.ec_info.y = util.Int2Bytes(y_weak)
+
+    non_weak = [negated_key, colliding_x64_key]
+    self.assertFalse(check.Check(non_weak))
+    self.assertResults(non_weak, check.check_name, False)
 
   def testCheckECKeySmallDifference(self):
     # Weak keys.

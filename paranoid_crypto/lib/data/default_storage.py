@@ -35,6 +35,9 @@ OPENSSL_DENY_RSA1024 = "weak_keylist.RSA-1024.dat"
 OPENSSL_DENY_RSA2048 = "weak_keylist.RSA-2048.dat"
 OPENSSL_DENY_RSA4096 = "weak_keylist.RSA-4096.dat"
 
+OPENSSL_DENY_EC_FILE = "openssl_denylist_ec.lzma"
+UNSEEDED_RANDS_EC_FILE = "unseeded_rands_ec.lzma"
+
 
 class DefaultStorage(storage.Storage):
   """Default implementation of storage.Storage.
@@ -76,3 +79,20 @@ class DefaultStorage(storage.Storage):
     weak_keylist.update(_ReadDenylist("RSA-2048", file_rsa2048))
     weak_keylist.update(_ReadDenylist("RSA-4096", file_rsa4096))
     return weak_keylist
+
+  def GetOpensslDenylistEC(self) -> data_pb2.OpensslDenylistECData:
+    # TODO(pedroysb): Generate and include data for secp192r1, secp224r1, and
+    # secp256k1 (currently omitted to save space and memory).
+    path = PATH + OPENSSL_DENY_EC_FILE
+    logging.info("Loading OpenSSL EC denylist data from %s.", path)
+    data = resources.GetParanoidResourceAsFile(path, "rb").read()
+    return data_pb2.OpensslDenylistECData.FromString(lzma.decompress(data))
+
+  def GetUnseededRandsEC(self) -> data_pb2.UnseededRandsECData:
+    # TODO(pedroysb): Generate and include data for secp192r1, secp224r1,
+    # secp256k1, and brainpoolP256r1-brainpoolP512r1 (currently omitted to save
+    # space and memory).
+    path = PATH + UNSEEDED_RANDS_EC_FILE
+    logging.info("Loading unseeded rands EC data from %s.", path)
+    data = resources.GetParanoidResourceAsFile(path, "rb").read()
+    return data_pb2.UnseededRandsECData.FromString(lzma.decompress(data))
