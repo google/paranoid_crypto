@@ -13,12 +13,22 @@
 # limitations under the License.
 """Module containing Paranoid single checks for EC keys."""
 
+from __future__ import annotations
+
+import array
+import bisect
+import sys
+from typing import Optional
 from absl import logging
 from paranoid_crypto import paranoid_pb2
 from paranoid_crypto.lib import base_check
 from paranoid_crypto.lib import consts
 from paranoid_crypto.lib import ec_util
 from paranoid_crypto.lib import util
+from paranoid_crypto.lib.data import data_pb2
+from paranoid_crypto.lib.data import debian_openssl_generator
+from paranoid_crypto.lib.data import default_storage
+from paranoid_crypto.lib.data import storage
 
 
 class CheckValidECKey(base_check.ECKeyCheck):
@@ -142,4 +152,221 @@ class CheckWeakECPrivateKey(base_check.ECKeyCheck):
           any_weak = True
           test_result.result = True
         util.SetTestResult(key.test_info, test_result)
+    return any_weak
+
+
+class CheckOpensslDenylistEC(base_check.ECKeyCheck):
+  """Checks EC keys against Debian OpenSSL predictable PRNG (CVE-2008-0166).
+
+  Between September 2006 and May 2008, Debian and Ubuntu distributed OpenSSL
+  0.9.8c through 0.9.8g packages with two entropy-mixing lines commented out in
+  crypto/rand/md_rand.c, leaving the PRNG seeded only by the 15-bit process ID
+  (0..32767), architecture word size/endianness, and pre-seeding code path.
+
+  This check uses a precomputed sorted table of 32-bit x-coordinate suffixes per
+  curve to filter keys in O(log M) time, then reconstructs the exact candidate
+  scalar d via debian_openssl_generator.generate_ec_private_key and verifies
+  d * G == P on the curve, guaranteeing zero false positives and recovering d.
+  By default, DefaultStorage provides precomputed tables for secp256r1,
+  secp384r1, and secp521r1.
+  """
+
+  _DEFAULT_TABLES: Optional[
+      dict[int, tuple[array.array[int], bytes, array.array[int]]]
+  ] = None
+
+  def __init__(self, paranoid_storage: Optional[storage.Storage] = None):
+    """CheckOpensslDenylistEC check constructor.
+
+    Args:
+      paranoid_storage: Optional instance of storage.Storage providing
+        GetOpensslDenylistEC. When omitted, DefaultStorage is cached at the
+        class level so worker processes do not re-serialize the table per task.
+    """
+    super().__init__(paranoid_pb2.SeverityType.SEVERITY_CRITICAL)
+    if paranoid_storage is None:
+      self._custom_tables = None
+      self._GetTables()
+    else:
+      self._custom_tables = self._ParseTables(
+          paranoid_storage.GetOpensslDenylistEC()
+      )
+
+  @classmethod
+  def _ParseTables(
+      cls, proto_data: data_pb2.OpensslDenylistECData
+  ) -> dict[int, tuple[array.array[int], bytes, array.array[int]]]:
+    tables: dict[int, tuple[array.array[int], bytes, array.array[int]]] = {}
+    for curve_id, curve_table in proto_data.curve_tables.items():
+      xs = array.array("I")
+      if xs.itemsize != 4:
+        raise RuntimeError(f"Expected 4-byte uint32 array, got {xs.itemsize}")
+      xs.frombytes(curve_table.x_lsb32)
+      meta_lo = array.array("H")
+      if meta_lo.itemsize != 2:
+        raise RuntimeError(
+            f"Expected 2-byte uint16 array, got {meta_lo.itemsize}"
+        )
+      meta_lo.frombytes(curve_table.meta_lo)
+      if sys.byteorder != "little":
+        xs.byteswap()
+        meta_lo.byteswap()
+      meta_hi = curve_table.meta_hi
+      if not (len(xs) == len(meta_hi) == len(meta_lo)):
+        raise ValueError("Mismatched OpenSSL EC denylist table lengths.")
+      tables[int(curve_id)] = (xs, meta_hi, meta_lo)
+    return tables
+
+  def _GetTables(
+      self,
+  ) -> dict[int, tuple[array.array[int], bytes, array.array[int]]]:
+    if self._custom_tables is not None:
+      return self._custom_tables
+    if CheckOpensslDenylistEC._DEFAULT_TABLES is None:
+      CheckOpensslDenylistEC._DEFAULT_TABLES = self._ParseTables(
+          default_storage.DefaultStorage().GetOpensslDenylistEC()
+      )
+    return CheckOpensslDenylistEC._DEFAULT_TABLES
+
+  def Check(self, artifacts: list[paranoid_pb2.ECKey]) -> bool:
+    any_weak = False
+    tables = self._GetTables()
+    for key in artifacts:
+      curve = ec_util.CURVE_FACTORY.get(key.ec_info.curve_type, None)
+      if curve is None:
+        # Skipping the test. CheckValidECKey already checks this.
+        continue
+      test_result = self._CreateTestResult()
+      # TODO(pedroysb): Generate and include data for secp192r1, secp224r1, and
+      # secp256k1 (currently omitted from DefaultStorage to save space and
+      # memory).
+      curve_table = tables.get(key.ec_info.curve_type)
+      if curve_table is not None:
+        xs, meta_hi, meta_lo = curve_table
+        n_entries = len(xs)
+        if n_entries > 0:
+          point = ec_util.PublicPoint(key.ec_info)
+          x_lsb32 = int(point[0]) & 0xFFFFFFFF
+          idx = bisect.bisect_left(xs, x_lsb32)
+          while idx < n_entries and xs[idx] == x_lsb32:
+            meta = (meta_hi[idx] << 16) | meta_lo[idx]
+            cfg_idx = meta >> 15
+            pid = meta & 0x7FFF
+            d = debian_openssl_generator.generate_ec_private_key(
+                cfg_idx, pid, int(curve.n)
+            )
+            if curve.Multiply(curve.g, d) == point:
+              discrete_log = format(int(d), "x")
+              logging.warning(
+                  "OpensslDenylistEC check failed! Discrete logarithm found:"
+                  " %s %s",
+                  discrete_log,
+                  key.ec_info,
+              )
+              util.AttachInfo(
+                  key.test_info, consts.INFO_NAME_DISCRETE_LOG, discrete_log
+              )
+              any_weak = True
+              test_result.result = True
+              break
+            idx += 1
+      util.SetTestResult(key.test_info, test_result)
+    return any_weak
+
+
+class CheckUnseededRandEC(base_check.ECKeyCheck):
+  """Checks if EC keys were generated from unseeded PRNGs or weak/zero seeds.
+
+  Detects EC public keys whose private scalar d was produced by unseeded or
+  default-seeded PRNGs (GMP Mersenne Twister and linear congruential generators,
+  Go math/rand, C++ std::mt19937 / std::mt19937_64, Python random.Random,
+  Java java.util.Random, C glibc/BSD/MSVC rand()) or deterministic derivations
+  from all-zero, repeated-byte, sequential-byte, small-integer, or common
+  placeholder seeds via SHA-1/256/384/512, SHAKE-256, HMAC/HKDF-SHA256, or
+  BIP-32.
+
+  Lookup is O(1) per key via a 64-bit x-coordinate suffix hash map, followed by
+  exact curve verification d * G == P to guarantee zero false positives and
+  attach the recovered discrete logarithm. By default, DefaultStorage provides
+  precomputed tables for secp256r1, secp384r1, and secp521r1.
+  """
+
+  _DEFAULT_TABLES: Optional[dict[int, dict[int, bytes]]] = None
+
+  def __init__(self, paranoid_storage: Optional[storage.Storage] = None):
+    """CheckUnseededRandEC check constructor.
+
+    Args:
+      paranoid_storage: Optional instance of storage.Storage providing
+        GetUnseededRandsEC.
+    """
+    super().__init__(paranoid_pb2.SeverityType.SEVERITY_CRITICAL)
+    if paranoid_storage is None:
+      self._custom_tables = None
+      self._GetTables()
+    else:
+      self._custom_tables = self._ParseTables(
+          paranoid_storage.GetUnseededRandsEC()
+      )
+
+  @classmethod
+  def _ParseTables(
+      cls, proto_data: data_pb2.UnseededRandsECData
+  ) -> dict[int, dict[int, bytes]]:
+    tables: dict[int, dict[int, bytes]] = {}
+    for curve_id, curve_table in proto_data.curve_tables.items():
+      tables[int(curve_id)] = dict(curve_table.x_lsb64_to_d)
+    return tables
+
+  def _GetTables(self) -> dict[int, dict[int, bytes]]:
+    if self._custom_tables is not None:
+      return self._custom_tables
+    if CheckUnseededRandEC._DEFAULT_TABLES is None:
+      CheckUnseededRandEC._DEFAULT_TABLES = self._ParseTables(
+          default_storage.DefaultStorage().GetUnseededRandsEC()
+      )
+    return CheckUnseededRandEC._DEFAULT_TABLES
+
+  def Check(self, artifacts: list[paranoid_pb2.ECKey]) -> bool:
+    any_weak = False
+    tables = self._GetTables()
+    for key in artifacts:
+      curve = ec_util.CURVE_FACTORY.get(key.ec_info.curve_type, None)
+      if curve is None:
+        # Skipping the test. CheckValidECKey already checks this.
+        continue
+      test_result = self._CreateTestResult()
+      # TODO(pedroysb): Generate and include data for secp192r1, secp224r1,
+      # secp256k1, and brainpoolP256r1-brainpoolP512r1 (currently omitted from
+      # DefaultStorage to save space and memory).
+      curve_map = tables.get(key.ec_info.curve_type)
+      if curve_map:
+        point = ec_util.PublicPoint(key.ec_info)
+        x_lsb64 = int(point[0]) & 0xFFFFFFFFFFFFFFFF
+        d_bytes = curve_map.get(x_lsb64)
+        if d_bytes:
+          d_len = (int(curve.n).bit_length() + 7) // 8
+          if len(d_bytes) >= d_len and len(d_bytes) % d_len == 0:
+            candidates = [
+                util.Bytes2Int(d_bytes[i : i + d_len])
+                for i in range(0, len(d_bytes), d_len)
+            ]
+          else:
+            candidates = [util.Bytes2Int(d_bytes)]
+          for d in candidates:
+            if 1 <= d < curve.n and curve.Multiply(curve.g, d) == point:
+              discrete_log = format(int(d), "x")
+              logging.warning(
+                  "UnseededRandEC check failed! Discrete logarithm found:"
+                  " %s %s",
+                  discrete_log,
+                  key.ec_info,
+              )
+              util.AttachInfo(
+                  key.test_info, consts.INFO_NAME_DISCRETE_LOG, discrete_log
+              )
+              any_weak = True
+              test_result.result = True
+              break
+      util.SetTestResult(key.test_info, test_result)
     return any_weak

@@ -35,6 +35,8 @@ _ACTIVE_EC_SINGLE_CHECKS = (
     ec_single_checks.CheckValidECKey,
     ec_single_checks.CheckWeakCurve,
     ec_single_checks.CheckWeakECPrivateKey,
+    ec_single_checks.CheckOpensslDenylistEC,
+    ec_single_checks.CheckUnseededRandEC,
 )
 
 _ACTIVE_EC_AGGREGATE_CHECKS = (ec_aggregate_checks.CheckECKeySmallDifference,)

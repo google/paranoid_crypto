@@ -64,3 +64,11 @@ class Storage(metaclass=abc.ABCMeta):
     Each element of the set is a string of the format <keytype>:<h> where h
     is the first 10 bytes of the RSA modulus (as a string) in hex format.
     """
+
+  @abc.abstractmethod
+  def GetOpensslDenylistEC(self) -> data_pb2.OpensslDenylistECData:
+    """Returns per-curve lookup tables used for EC CVE-2008-0166 detection."""
+
+  @abc.abstractmethod
+  def GetUnseededRandsEC(self) -> data_pb2.UnseededRandsECData:
+    """Returns per-curve lookup tables of EC keys from unseeded PRNGs."""

@@ -14,6 +14,7 @@
 """Test base class for paranoid_crypto.lib.paranoid_*_test."""
 from absl.testing import absltest
 from paranoid_crypto.lib import consts
+from paranoid_crypto.lib import ec_util
 from paranoid_crypto.lib import util
 
 
@@ -33,6 +34,24 @@ class ParanoidBaseTest(absltest.TestCase):
       self.assertNotEmpty(factors)
       for f in factors:  # pyrefly: ignore[not-iterable]
         self.assertEqual(composed % f, 0)
+
+  def assertDLogs(self, keys):
+    for key in keys:
+      attached = util.GetAttachedInfo(
+          key.test_info, consts.INFO_NAME_DISCRETE_LOG
+      )
+      if attached is None:
+        self.fail('None discrete log attached_info.')
+      d = int(attached.value, 16)
+      curve = ec_util.CURVE_FACTORY.get(key.ec_info.curve_type)
+      if curve is None:
+        self.fail('None curve.')
+      self.assertGreaterEqual(d, 1)
+      self.assertLess(d, curve.n)
+      self.assertEqual(
+          curve.Multiply(curve.g, d),
+          ec_util.PublicPoint(key.ec_info),
+      )
 
   def assertResults(self, protos, check_name, weak):
     for proto in protos:
