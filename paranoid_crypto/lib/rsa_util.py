@@ -18,6 +18,16 @@ import gmpy2 as gmpy
 from paranoid_crypto.lib import lll
 from paranoid_crypto.lib import ntheory_util
 from paranoid_crypto.lib import special_case_factoring
+from paranoid_crypto.lib.cc_util.pybind import rsa_batch
+
+_BATCH_GCD_INGEST_CHUNK = 65536
+
+
+def _IntToMagBytes(val: int) -> bytes:
+  iv = abs(int(val))
+  if iv == 0:
+    return b""
+  return iv.to_bytes((iv.bit_length() + 7) >> 3, "big")
 
 
 def BatchGCD(
@@ -35,27 +45,25 @@ def BatchGCD(
     a list of GCDs. The i-th element of the result is the GCD of values[i]
     with the product of all values[j] with i!=j and other_values_prod.
   """
-  unique_values = list(set(values))
-  prod_tree, t = ntheory_util.ExtendedProductTree(unique_values)
-  if other_values_prod:
-    t *= other_values_prod
+  if not values:
+    return []
+  acc = rsa_batch.RsaBatchAccumulator()
+  first_limb_bytes = ((abs(int(values[0])).bit_length() + 63) >> 6) << 3
+  expected_limb_bytes = (
+      len(values) * first_limb_bytes if first_limb_bytes <= 2048 else 0
+  )
+  acc.Reserve(len(values), expected_limb_bytes)
+  for start in range(0, len(values), _BATCH_GCD_INGEST_CHUNK):
+    chunk = values[start : start + _BATCH_GCD_INGEST_CHUNK]
+    acc.AddSignedBatch([(v < 0, _IntToMagBytes(v)) for v in chunk])
 
-  # For efficiency, we want to create a remainder tree to explore the property
-  # GCD(a, foo % a) = GCD(a, foo).
-  # https://proofwiki.org/wiki/GCD_from_Congruence_Modulo_m
-
-  remainders = [t]
-  while prod_tree:
-    unique_values = prod_tree.pop()
-    prev = remainders
-    remainders = [None] * len(unique_values)
-    for i in range(len(unique_values)):
-      if i + 1 == len(unique_values) and i % 2 == 0:
-        remainders[i] = prev[i // 2]  # pyrefly: ignore[unsupported-operation]
-      else:
-        remainders[i] = prev[i // 2] % unique_values[i]  # pyrefly: ignore[unsupported-operation]
-  gcds_dict = {v: gmpy.gcd(v, r) for v, r in zip(unique_values, remainders)}
-  return [gcds_dict[v] for v in values]
+  other_be = (
+      _IntToMagBytes(other_values_prod)
+      if other_values_prod is not None
+      else None
+  )
+  raw_gcds = acc.ComputeAllGcds(other_be)
+  return [gmpy.mpz(int.from_bytes(b, "big")) for b in raw_gcds]
 
 
 def FermatFactor(n: int, max_steps: int) -> Optional[tuple[int, int]]:

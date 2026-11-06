@@ -60,6 +60,34 @@ class RsaUtilTest(absltest.TestCase):
     self.assertEqual(
         rsa_util.BatchGCD([2 * 3, 2 * 5, 3 * 5]), [2 * 3, 2 * 5, 3 * 5]
     )
+    self.assertEmpty(rsa_util.BatchGCD([]))
+    self.assertEqual(rsa_util.BatchGCD([35]), [1])
+    self.assertEqual(rsa_util.BatchGCD([35], 15), [5])
+
+  def testBatchGcdRandomizedDifferential(self):
+    rng = random.Random(42)
+    shared = [int(gmpy.next_prime(rng.getrandbits(128))) for _ in range(4)]
+    vals = []
+    for i in range(60):
+      p = (
+          shared[i % len(shared)]
+          if i % 13 == 0
+          else int(gmpy.next_prime(rng.getrandbits(256)))
+      )
+      q = int(gmpy.next_prime(rng.getrandbits(256)))
+      vals.append(gmpy.mpz(p * q))
+    vals.append(vals[0])  # Duplicate must not self-collide.
+    vals.append(gmpy.mpz(1))
+
+    unique = list(set(vals))
+    expected = []
+    for v in vals:
+      prod = gmpy.mpz(1)
+      for u in unique:
+        if u != v:
+          prod *= u
+      expected.append(gmpy.gcd(v, prod))
+    self.assertEqual(rsa_util.BatchGCD(vals), expected)
 
   def testFermat(self):
     p_fermat = gmpy.next_prime(random.getrandbits(1024))
