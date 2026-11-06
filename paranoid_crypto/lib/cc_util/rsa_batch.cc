@@ -129,27 +129,30 @@ class ThreadPool {
       return;
     }
 
-    next_index_.store(0, std::memory_order_relaxed);
-    task_count_ = count;
-    active_workers_ = active;
-    task_fn_ = &fn;
-    worker_error_ = nullptr;
-    pending_workers_ = active - 1;
     {
       std::lock_guard lock(mu_);
+      next_index_.store(0, std::memory_order_relaxed);
+      task_count_ = count;
+      active_workers_ = active;
+      task_fn_ = &fn;
+      worker_error_ = nullptr;
+      pending_workers_ = active - 1;
       ++generation_;
     }
     cv_start_.notify_all();
 
     RunItems(0);
 
+    std::exception_ptr err;
     {
       std::unique_lock lock(mu_);
       cv_done_.wait(lock, [this]() { return pending_workers_ == 0; });
+      task_fn_ = nullptr;
+      err = worker_error_;
+      worker_error_ = nullptr;
     }
-    task_fn_ = nullptr;
-    if (worker_error_) {
-      std::rethrow_exception(worker_error_);
+    if (err) {
+      std::rethrow_exception(err);
     }
   }
 
