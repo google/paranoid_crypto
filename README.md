@@ -80,7 +80,10 @@ Clone the repository:
 
 Install dependencies:
 
-```$ sudo apt update && sudo apt install python3 python3-full python3-pip python3-pybind11 python3-fpylll python3-gmpy2 protobuf-compiler```
+```
+$ sudo apt update && sudo apt install python3 python3-full python3-pip \
+  python3-pybind11 python3-fpylll python3-gmpy2 libgmp-dev protobuf-compiler
+```
 
 Create and activate a virtual environment:
 

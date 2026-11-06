@@ -20,7 +20,6 @@ from paranoid_crypto.lib import ec_util
 from paranoid_crypto.lib import paranoid
 from paranoid_crypto.lib import paranoid_base_test
 from paranoid_crypto.lib import util
-from paranoid_crypto.lib.paranoid import ec_aggregate_checks
 from paranoid_crypto.lib.paranoid import ecdsa_sig_checks
 
 # Good ECDSA signatures.
@@ -518,9 +517,6 @@ bad_ecdsa_generalized = [
     # Make sure bad deterministic ECDSA are also flagged:
     copy.deepcopy(bad_ecdsa_generalized_1),
 ]
-
-# Trick to replace CheckECKeySmallDifference default max_diff (tests run faster)
-ec_aggregate_checks.CheckECKeySmallDifference.__init__.__defaults__ = (2**8,)
 
 
 class ParanoidECDSATest(paranoid_base_test.ParanoidBaseTest):
