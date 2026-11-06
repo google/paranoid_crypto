@@ -46,10 +46,10 @@ simultaneous modular inversion trick [BosEtAl]:
     single `BatchInverse` call, computing the $x$-coordinates of both
     $P + Q_i$ and $P - Q_i$ requires only 2.5 modular multiplications and 1
     modular squaring per point.
-*   **C++ GMP Engine (`EcBatchEngine`):** For odd prime moduli (covering all
-    supported NIST, `secp256k1`, and Brainpool curves), batch
-    discrete-logarithm searches execute in C++ over GMP (`libgmp` / `mpz_class`)
-    and release the Python GIL, falling back to pure Python if unavailable.
+*   **C++ GMP Engine (`EcBatchEngine`):** For all supported prime-field curves
+    (NIST, `secp256k1`, and Brainpool), batch discrete-logarithm searches
+    execute natively in C++ over GMP (`libgmp` / `mpz_class`) and release the
+    Python GIL.
 
 ## Single Key Checks
 
@@ -230,20 +230,15 @@ the other.
 
 `EcCurve.BatchDLOfDifferences` compares a batch of $N$ target `points` against
 both each other and an optional list of $M$ previously tested `other_points`
-in time $O((N + M) \sqrt{\text{max_diff}})$:
-
-*   **C++ L2-sliced multi-target BSGS (`EcBatchEngine.DiffBatchDL`):** By
-    default, deduplicates identical input points in-place, selects baby-step
-    radius $h = \lfloor \sqrt{\text{max_diff}} / 2 \rfloor$ (exploiting pair
-    symmetry to test only $0 < k < \text{max_diff}$ when `other_points` is
-    empty, or $\lfloor \sqrt{\text{max_diff} / 2} \rfloor$ otherwise) and
-    giant-step stride $m = 2h + 1$, inserts baby steps $Q \pm b \cdot G$
-    into bounded L2-sliced `6`-byte open-addressed hash tables (tiling batches
-    exceeding 36M baby-step entries), and streams batched giant-step probes.
-*   **Pure-Python fallback:** When the C++ extension is unavailable, selects
-    among direct pairwise lookup, single-pass hash-keyed BSGS, and 128 MiB
-    `uint32` blocked-Bloom BSGS so peak memory stays bounded even on large
-    batches.
+in time $O((N + M) \sqrt{\text{max_diff}})$ via C++ L2-sliced multi-target
+BSGS (`EcBatchEngine.DiffBatchDL`). The engine deduplicates identical input
+points in-place, selects baby-step radius
+$h = \lfloor \sqrt{\text{max_diff}} / 2 \rfloor$ (exploiting pair symmetry to
+test only $0 < k < \text{max_diff}$ when `other_points` is empty, or
+$\lfloor \sqrt{\text{max_diff} / 2} \rfloor$ otherwise) and giant-step stride
+$m = 2h + 1$, inserts baby steps $Q \pm b \cdot G$ into bounded L2-sliced
+`6`-byte open-addressed hash tables (tiling batches exceeding 36M baby-step
+entries), and streams batched giant-step probes.
 
 <!-- Literature -->
 
