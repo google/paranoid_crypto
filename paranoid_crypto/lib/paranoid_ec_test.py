@@ -173,9 +173,6 @@ good_ec_key_secp256r1_2.ec_info.y = util.Hex2Bytes(
 good_ec_secp256r1_keys = [good_ec_key_secp256r1, good_ec_key_secp256r1_2]
 good_and_bad_ec_keys = [good_ec_key_secp256r1, bad_ec_key_invalid]
 
-# Trick to replace CheckECKeySmallDifference default max_diff (tests run faster)
-ec_aggregate_checks.CheckECKeySmallDifference.__init__.__defaults__ = (2**8,)
-
 
 def _MakeECKeyFromPrivate(
     curve_type: paranoid_pb2.CurveType, d: int
@@ -403,19 +400,111 @@ class ParanoidECTest(paranoid_base_test.ParanoidBaseTest):
     self.assertResults(non_weak, check.check_name, False)
 
   def testCheckECKeySmallDifference(self):
-    # Weak keys.
-    check = ec_aggregate_checks.CheckECKeySmallDifference(max_diff=2**12)
+    # Weak keys within the default max_diff = 2**16 bound.
+    check = ec_aggregate_checks.CheckECKeySmallDifference()
     self.assertTrue(check.Check(ec_keys_small_difference))
     self.assertResults(ec_keys_small_difference, check.check_name, True)
-    # Repeated keys does not flag.
-    check = ec_aggregate_checks.CheckECKeySmallDifference(max_diff=2**12)
+    # Repeated keys do not flag.
+    check = ec_aggregate_checks.CheckECKeySmallDifference()
     self.assertFalse(check.Check([bad_ec_key_diff1, bad_ec_key_diff1]))
     self.assertTrue(check.Check(ec_keys_small_difference))
+    # Keys differing by >= 2**16 are not flagged by default.
+    p256 = ec_single_checks.ec_util.CURVE_FACTORY[
+        paranoid_pb2.CurveType.CURVE_SECP256R1
+    ]
+    assert p256 is not None
+    base_priv = (
+        0x519B423D715F8B581F4FA8EE59F4771A5B44C8130B4E3EACCA54A56DDA72B464
+    )
+    far_keys = []
+    for priv in (base_priv, base_priv + 2**16):
+      px, py = p256.Multiply(p256.g, priv)
+      assert px is not None and py is not None
+      key = paranoid_pb2.ECKey()
+      key.ec_info.curve_type = paranoid_pb2.CurveType.CURVE_SECP256R1
+      key.ec_info.x = util.Int2Bytes(int(px))
+      key.ec_info.y = util.Int2Bytes(int(py))
+      far_keys.append(key)
+    self.assertFalse(check.Check(far_keys))
+    self.assertResults(far_keys, check.check_name, False)
 
   def testCheckAllEC(self):
     self.assertFalse(paranoid.CheckAllEC(good_ec_keys))
     for ec_check_name in paranoid.GetECAllChecks():
       self.assertResults(good_ec_keys, ec_check_name, False)
+
+  def testCheckWeakECPrivateKeyExtendedForms(self):
+    check = ec_single_checks.CheckWeakECPrivateKey()
+    ec_u = ec_single_checks.ec_util
+    consts_mod = ec_single_checks.consts
+    p256 = ec_u.CURVE_FACTORY[paranoid_pb2.CurveType.CURVE_SECP256R1]
+    p384 = ec_u.CURVE_FACTORY[paranoid_pb2.CurveType.CURVE_SECP384R1]
+    p521 = ec_u.CURVE_FACTORY[paranoid_pb2.CurveType.CURVE_SECP521R1]
+    assert p256 is not None and p384 is not None and p521 is not None
+
+    cases = [
+        # 0xff-padded 32-byte buffer with middle 4-byte window on secp256r1.
+        (
+            paranoid_pb2.CurveType.CURVE_SECP256R1,
+            p256,
+            ((1 << 256) - 1 - (0x12345678 << 64)) % int(p256.n),
+        ),
+        # Two's-complement sign-extended negative int32_t on secp384r1.
+        (
+            paranoid_pb2.CurveType.CURVE_SECP384R1,
+            p384,
+            ((1 << 384) - 424242) % int(p384.n),
+        ),
+        # Negative 32-bit integer reduced modulo n on secp256r1.
+        (
+            paranoid_pb2.CurveType.CURVE_SECP256R1,
+            p256,
+            int(p256.n) - 0xDEADBEEF,
+        ),
+        # secp521r1 top byte-aligned window (2**496), bit-aligned 32-MSB window
+        # (2**489), 17th repeated 32-bit word, and 66-byte 0xff-padded buffer.
+        (
+            paranoid_pb2.CurveType.CURVE_SECP521R1,
+            p521,
+            (0xCAFEBABE << 496) % int(p521.n),
+        ),
+        (
+            paranoid_pb2.CurveType.CURVE_SECP521R1,
+            p521,
+            (0x87654321 << 489) % int(p521.n),
+        ),
+        (
+            paranoid_pb2.CurveType.CURVE_SECP521R1,
+            p521,
+            (0x13579BDF * sum(1 << (32 * i) for i in range(17))) % int(p521.n),
+        ),
+        (
+            paranoid_pb2.CurveType.CURVE_SECP521R1,
+            p521,
+            ((1 << 528) - 1 - (0x0ACE1357 << 160)) % int(p521.n),
+        ),
+    ]
+
+    weak_keys = []
+    expected_dlogs = []
+    for curve_type, curve, priv in cases:
+      px, py = curve.Multiply(curve.g, priv)
+      assert px is not None and py is not None
+      key = paranoid_pb2.ECKey()
+      key.ec_info.curve_type = curve_type
+      key.ec_info.x = util.Int2Bytes(int(px))
+      key.ec_info.y = util.Int2Bytes(int(py))
+      weak_keys.append(key)
+      expected_dlogs.append(format(priv, 'x'))
+
+    self.assertTrue(check.Check(weak_keys))
+    self.assertResults(weak_keys, check.check_name, True)
+    for key, expected_hex in zip(weak_keys, expected_dlogs):
+      info = util.GetAttachedInfo(
+          key.test_info, consts_mod.INFO_NAME_DISCRETE_LOG
+      )
+      self.assertIsNotNone(info)
+      self.assertEqual(info.value, expected_hex)
 
 
 if __name__ == '__main__':

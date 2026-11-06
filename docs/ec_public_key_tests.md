@@ -34,17 +34,22 @@ flaws in key generation or curve selection can introduce severe weaknesses:
 ## Batch Elliptic Curve Arithmetic
 
 Because testing millions of EC keys individually would be prohibitively slow,
-`ec_util.py` implements batch elliptic curve arithmetic in affine coordinates
-using Montgomery's simultaneous modular inversion trick [BosEtAl]:
+`ec_util.py` and its C++17 `pybind11` extension (`cc_util/ec_batch`) implement
+batch elliptic curve arithmetic in affine coordinates using Montgomery's
+simultaneous modular inversion trick [BosEtAl]:
 
 *   **Simultaneous Inversion (`BatchInverse`):** The modular inverses of $N$
-    field elements are computed using a single modular inversion (`gmpy.invert`)
-    and $3(N - 1)$ modular multiplications.
+    field elements are computed using a single modular inversion and
+    $3(N - 1)$ modular multiplications.
 *   **Affine Batch Addition (`BatchAdd`, `BatchAddX`, `BatchAddSubtractX`):** By
     inverting all $x$-coordinate differences $x_P - x_{Q_i} \pmod p$ in a
     single `BatchInverse` call, computing the $x$-coordinates of both
     $P + Q_i$ and $P - Q_i$ requires only 2.5 modular multiplications and 1
     modular squaring per point.
+*   **C++ GMP Engine (`EcBatchEngine`):** For odd prime moduli (covering all
+    supported NIST, `secp256k1`, and Brainpool curves), batch
+    discrete-logarithm searches execute in C++ over GMP (`libgmp` / `mpz_class`)
+    and release the Python GIL, falling back to pure Python if unavailable.
 
 ## Single Key Checks
 
@@ -79,48 +84,72 @@ than $2^{112}$ operations. Keys on such curves are flagged with
 ### CheckWeakECPrivateKey
 
 Checks whether the private key $d$ (where $P = d \cdot G$) has one of the
-following low-entropy structures (`SEVERITY_CRITICAL`), motivated by weak keys
-discovered in the wild [ethercombing]:
+following low-entropy structures modulo $n$ (`SEVERITY_CRITICAL`), motivated
+by weak keys discovered in the wild [ethercombing]:
 
-1.  **Single 4-byte window set:** Only 4 contiguous bytes (32 bits) of $d$ are
-    non-zero at a byte-aligned offset
-    $0 \le 8j \le \text{bit_length}(n) - 32$:
+1.  **Single 4-byte window set in a `0x00`-padded buffer:** Only 4 contiguous
+    bytes (at byte-aligned offset $0 \le 8j \le \text{byte_bits}(n) - 32$) or
+    the 32 most significant bits (offset $\text{bit_length}(n) - 32$ when
+    $\text{bit_length}(n)$ is not a multiple of 8, such as `secp521r1`) are
+    non-zero:
 
-$$d = i \cdot 2^{8j} \quad (0 < i < 2^{32}).$$
+$$d \equiv u \cdot m_j \pmod{n} \quad (0 \le u < 2^{32}).$$
 
-2.  **Repeated 32-bit words:** The private key consists of a constant 32-bit
-    word $i$ repeated $m$ times
-    ($2 \le m \le \lfloor \text{bit_length}(n) / 32 \rfloor$):
+2.  **Single 4-byte window in a `0xff`-padded buffer or sign-extended negative
+    32-bit integer:** All bits outside a 32-bit window $m_j$ remain `0xff`
+    (for example from an erased flash page or `memset(..., 0xff, ...)` buffer
+    followed by a partial 4-byte RNG write, or two's-complement sign extension
+    of a negative `int32_t` across $B = 2^{\text{bit_length}(n)} - 1$ or
+    $B = 2^{\text{byte_bits}(n)} - 1$):
 
-$$d = i \cdot \sum_{k=0}^{m - 1} 2^{32k} \quad (0 < i < 2^{32}).$$
+$$d \equiv B - u \cdot m_j \pmod{n} \quad (0 \le u < 2^{32}).$$
 
-Rather than running a separate search for each multiplier $m_j$,
-`ExtendedBatchDL` reduces all candidate forms to a single 32-bit discrete
-logarithm problem: if $P = (i \cdot m_j) G$, then
+3.  **Negative 32-bit integer reduced modulo $n$:**
 
-$$m_j^{-1} P = i \cdot G \quad \text{with } 0 < i < 2^{32},$$
+$$d \equiv -u \pmod{n} \quad (0 < u < 2^{32}).$$
 
-where $m_j^{-1}$ is the modular inverse of $m_j$ modulo $n$.
+4.  **Repeated 32-bit words:** The private key consists of a constant 32-bit
+    word $u$ repeated $w$ times
+    ($2 \le w \le \lceil \text{bit_length}(n) / 32 \rceil$):
 
-1.  **Point precomputation:** For each input key $P$, the check computes the
-    transformed points $m_j^{-1} P$ using a precomputed width-2 non-adjacent
-    form (NAF) addition chain for the repeated-word multipliers and the highest
-    byte-shift multiplier, while deriving all remaining byte-shifted points
-    $(2^{8j})^{-1} P = 2^8 \cdot (2^{8(j+1)})^{-1} P$ via 8 fast Jacobian
-    point doublings per step, followed by a chunked `BatchJacobianToAffine`
-    conversion.
-2.  **Multi-target Baby-Step Giant-Step (`BatchDL`):** Given
+$$d \equiv u \cdot \sum_{k=0}^{w - 1} 2^{32k} \pmod{n} \quad (0 < u < 2^{32}).$$
+
+Rather than running a separate search for each candidate structure,
+`ExtendedBatchDL` algebraically reduces every form to solving discrete
+logarithms $u \in [0, 2^{32})$:
+
+*   Forms (1) and (4): $Q_{P,j} = m_j^{-1} P = u \cdot G$.
+*   Form (2): $m_j^{-1}(B \cdot G - P) = C_{B,j} - Q_{P,j} = u \cdot G$,
+    reusing $Q_{P,j}$ via a single affine `BatchAdd` with precomputed curve
+    constants $C_{B,j} = (B \cdot m_j^{-1} \bmod n) G$ and zero extra scalar
+    multiplications.
+*   Form (3): $-P = u \cdot G$.
+
+1.  **Chunked point precomputation:** Input keys are processed in bounded
+    chunks. For each key $P$, `ExtendedBatchDL` computes $m_j^{-1} P$ using
+    a precomputed width-2 non-adjacent form (NAF) addition chain for the
+    repeated-word multipliers, any non-byte-aligned MSB multiplier, and the
+    highest byte-shift multiplier, while deriving all remaining byte-shifted
+    points $(2^{8j})^{-1} P = 2^8 \cdot (2^{8(j+1)})^{-1} P$ via 8 Jacobian
+    point doublings per step, followed by `BatchJacobianToAffine`.
+2.  **Bounded-memory multi-target BSGS (`BatchDL`):** Given
     $M = \text{#forms} \cdot \text{#keys}$ target points and search bound
-    $B = 2^{32}$, `BatchDL` builds a baby-step table of $x$-coordinates of
-    $b \cdot G$ for $0 \le b < T \approx \sqrt{M B / 2}$ (exploiting the
-    sign symmetry $x(-Q) = x(Q)$ so each table entry covers both $+b$ and
-    $-b$) and takes giant steps of size $t = 2T - 1$ using
-    `BatchAddSubtractX`. The total time and memory complexity is
+    $2^{32}$, `BatchDL` builds a compact hash-keyed baby-step table of
+    $x$-coordinates of $b \cdot G$ for
+    $0 \le b < T = \min(T_{\max}, \lfloor \sqrt{M \cdot 2^{31}} \rfloor)$
+    (exploiting $x(-Q) = x(Q)$ so each entry covers $\pm b$) and takes giant
+    steps of size $t = 2T - 1$ using batched simultaneous inversions. In the
+    C++ engine (`cc_util/ec_batch`), both point precomputation and BSGS run
+    without materializing intermediate Python point lists, partitioning the
+    baby-step table into L2-resident slices of `6`-byte open-addressed slots
+    (`16`-bit tag + `32`-bit index). For typical batches ($T < T_{\max}$), the
+    time and memory complexity is
 
 $$O\left(\sqrt{\text{#forms} \cdot \text{#keys} \cdot 2^{32}}\right).$$
 
-When a discrete logarithm $i$ is found for $m_j^{-1} P$, the private key
-$d = i \cdot m_j \bmod n$ is recovered and attached to the test result.
+When a discrete logarithm $u$ is found, the corresponding private scalar $d$
+is reconstructed modulo $n$, verified on the curve, and attached to the test
+result.
 
 ### CheckOpensslDenylistEC
 
@@ -188,34 +217,33 @@ $d \cdot G = P$, ensuring zero false positives and recovering $d$.
 ### CheckECKeySmallDifference
 
 Checks whether any two public keys $P$ and $Q$ on the same curve have
-private keys that differ by a small non-zero integer (`SEVERITY_HIGH`):
+private keys that differ by a small non-zero integer (`SEVERITY_HIGH`), with a
+default bound of `max_diff = 2**16` (`65,536`):
 
 $$P - Q = k \cdot G \quad \text{with } 0 < |k| < \text{max_diff}.$$
 
 While finding $P - Q = k \cdot G$ does not immediately reveal the individual
 private keys $d_P$ and $d_Q$, it proves that the two keys were generated by
-a severely flawed or correlated process (such as incrementing a seed or counter
-by a small step), and compromising either key immediately compromises the other.
+a severely flawed or correlated process (such as a shared counter or adjacent
+1-second timestamp seeds), and compromising either key immediately compromises
+the other.
 
-`EcCurve.BatchDLOfDifferences` supports comparing a batch of $N$ target
-`points` against both each other and an optional list of $M$ previously tested
-`other_points`, and automatically selects the faster of two algorithms based on
-the batch sizes $N, M$ and bound `max_diff`:
+`EcCurve.BatchDLOfDifferences` compares a batch of $N$ target `points` against
+both each other and an optional list of $M$ previously tested `other_points`
+in time $O((N + M) \sqrt{\text{max_diff}})$:
 
-1.  **Direct pairwise table lookup:** Precomputes the $x$-coordinates of
-    $k \cdot G$ for $0 \le k < \text{max_diff}$ in `PointTable` and uses
-    `BatchAddX` to test $x(P - Q)$ for all pairs $(P, Q)$, with complexity
-    $O(\text{max_diff} + N M + N^2 / 2)$.
-2.  **Multi-target Baby-Step Giant-Step (meet-in-the-middle):** Chooses
-    baby-step radius $h = \lfloor \sqrt{\text{max_diff} / 4} \rfloor$ and
-    giant-step stride $m = 2h + 1$. For each point $Q$, it inserts the
-    $x$-coordinates of the shifted baby-step points $Q \pm b \cdot G$
-    ($0 \le b \le h$) into a hash table, and for each point $P$ it queries
-    the giant-step points $P \pm g \cdot m G$ ($0 \le g \le r$). A match
-    $Q + b \cdot G = \pm(P - g \cdot m G)$ yields $P - Q = (g m + b) G$ in
-    time $O((N + M) \sqrt{\text{max_diff}})$, avoiding the
-    $O(\text{max_diff})$ table construction cost when `max_diff` is large
-    (such as the default `2**24` in `BatchDLOfDifferences`).
+*   **C++ L2-sliced multi-target BSGS (`EcBatchEngine.DiffBatchDL`):** By
+    default, deduplicates identical input points in-place, selects baby-step
+    radius $h = \lfloor \sqrt{\text{max_diff}} / 2 \rfloor$ (exploiting pair
+    symmetry to test only $0 < k < \text{max_diff}$ when `other_points` is
+    empty, or $\lfloor \sqrt{\text{max_diff} / 2} \rfloor$ otherwise) and
+    giant-step stride $m = 2h + 1$, inserts baby steps $Q \pm b \cdot G$
+    into bounded L2-sliced `6`-byte open-addressed hash tables (tiling batches
+    exceeding 36M baby-step entries), and streams batched giant-step probes.
+*   **Pure-Python fallback:** When the C++ extension is unavailable, selects
+    among direct pairwise lookup, single-pass hash-keyed BSGS, and 128 MiB
+    `uint32` blocked-Bloom BSGS so peak memory stays bounded even on large
+    batches.
 
 <!-- Literature -->
 

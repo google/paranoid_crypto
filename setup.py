@@ -36,6 +36,15 @@ _BM_CC_HEADERS = [
     'paranoid_crypto/lib/randomness_tests/cc_util/berlekamp_massey.h',
 ]
 
+_EC_BATCH_CC_SOURCES = [
+    'paranoid_crypto/lib/cc_util/ec_batch.cc',
+    'paranoid_crypto/lib/cc_util/pybind/ec_batch.cc',
+]
+
+_EC_BATCH_CC_HEADERS = [
+    'paranoid_crypto/lib/cc_util/ec_batch.h',
+]
+
 
 def _get_extra_compile_args():
   """Return extra compiler flags.
@@ -64,7 +73,14 @@ _EXT_MODULES = [
         sources=_BM_CC_SOURCES,
         depends=_BM_CC_HEADERS,
         include_dirs=['./'],
-        extra_compile_args=_get_extra_compile_args())
+        extra_compile_args=_get_extra_compile_args()),
+    Pybind11Extension(
+        'paranoid_crypto.lib.cc_util.pybind.ec_batch',
+        sources=_EC_BATCH_CC_SOURCES,
+        depends=_EC_BATCH_CC_HEADERS,
+        include_dirs=['./'],
+        libraries=['gmp'],
+        cxx_std=17),
 ]
 
 # Tuple of proto message definitions to build Python bindings for. Paths must

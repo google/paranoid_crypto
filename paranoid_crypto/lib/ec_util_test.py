@@ -14,6 +14,7 @@
 """Test for paranoid_crypto.lib.ec_util."""
 
 import random
+from unittest import mock
 from absl.testing import absltest
 from absl.testing import parameterized
 import gmpy2 as gmpy
@@ -36,9 +37,13 @@ class EcUtilTest(parameterized.TestCase):
       (c.name, c) for n, c in ec_util.CURVE_FACTORY.items() if c is not None
   ]
 
-  # Some tests are expensive and are only performed with the most important
-  # curves,
-  main_curves = [(n, c) for n, c in curves if n in ["secp256r1"]]
+  # Primary NIST curves tested by ExtendedBatchDL (covers both byte-aligned
+  # orders and secp521r1's 521-bit non-byte-aligned order).
+  main_curves = [
+      (n, c)
+      for n, c in curves
+      if n in ("secp256r1", "secp384r1", "secp521r1")
+  ]
 
   @parameterized.named_parameters(*curves)
   def testGroup(self, c: ec_util.EcCurve):
@@ -195,14 +200,47 @@ class EcUtilTest(parameterized.TestCase):
   @parameterized.named_parameters(*main_curves)
   def testExtendedBatchDL(self, c: ec_util.EcCurve):
     dl_bound = 2**32
-    quad_words = c.n.bit_length() // 32
-    dls = [random.randint(0, dl_bound) << (i * 32) for i in range(quad_words)]
-    mult = sum(2 ** (32 * i) for i in range(quad_words))
-    dls += [random.randint(0, dl_bound) * mult for i in range(4)]
-    points = [c.Multiply(c.g, i) for i in dls]
+    order = int(c.n)
+    bits = c.n.bit_length()
+    byte_bits = ((bits + 7) // 8) * 8
+    quad_words = (bits + 31) // 32
+    rng = random.Random(42)
+
+    # 1. 0x00-padded 4-byte windows (including top byte-aligned shift and
+    #    bit-aligned 32-MSB window on secp521r1).
+    dls = [
+        (rng.randint(1, dl_bound - 1) << (i * 32)) % order
+        for i in range(bits // 32)
+    ]
+    dls.append((0xCAFEBABE << (byte_bits - 32)) % order)
+    if bits % 8 != 0:
+      dls.append((0x87654321 << (bits - 32)) % order)
+
+    # 2. Repeated 32-bit words (including full ceil(bits / 32) words).
+    for words in (2, quad_words):
+      mult = sum(1 << (32 * i) for i in range(words))
+      dls.append((rng.randint(1, dl_bound - 1) * mult) % order)
+
+    # 3. 0xff-padded 4-byte windows and sign-extended negative 32-bit integers.
+    mask_bits = (1 << bits) - 1
+    for shift in (0, (byte_bits // 16) * 8, byte_bits - 32):
+      dls.append((mask_bits - (0x12345678 << shift)) % order)
+    if bits % 8 != 0:
+      dls.append((mask_bits - (0x2468ACE0 << (bits - 32))) % order)
+      mask_bytes = (1 << byte_bits) - 1
+      dls.append((mask_bytes - (0x13579BDF << 64)) % order)
+    dls.append(((1 << byte_bits) - 123456789) % order)
+
+    # 4. Negative 32-bit integers reduced modulo n, plus INFINITY (0).
+    dls.append(order - 1)
+    dls.append(order - 0xDEADBEEF)
+    dls.append(0)
+
+    strong_priv = rng.randint(2**64, order - 2**64)
+    points = [c.Multiply(c.g, d) for d in dls] + [c.Multiply(c.g, strong_priv)]
     res = c.ExtendedBatchDL(points)
-    for i, dl in enumerate(res):
-      self.assertEqual(dls[i], dl)
+    self.assertEqual(res[:-1], dls)
+    self.assertIsNone(res[-1])
 
   @parameterized.named_parameters(*curves)
   def testBatchDLOfDifferences(self, c: ec_util.EcCurve):
@@ -211,10 +249,12 @@ class EcUtilTest(parameterized.TestCase):
     priv = [
         rand[0],
         rand[1],
-        rand[0] + random.randint(-max_difference + 1, max_difference),
+        rand[0]
+        + random.choice((-1, 1)) * random.randint(1, max_difference - 1),
         rand[2],
         rand[3],
-        rand[1] + random.randint(-max_difference + 1, max_difference),
+        rand[1]
+        + random.choice((-1, 1)) * random.randint(1, max_difference - 1),
     ]
     points = [c.Multiply(c.g, p) for p in priv]
     new_points = points[:4]
@@ -224,6 +264,124 @@ class EcUtilTest(parameterized.TestCase):
     self.assertIsNotNone(res[1], "DL of old_points[1] is close to this")
     self.assertIsNotNone(res[2], "DL of new_points[0] is close to this")
     self.assertIsNone(res[3], "This is a random point")
+
+  def testBatchDLOfDifferencesStrategies(self):
+    c = ec_util.CURVE_FACTORY[paranoid_pb2.CurveType.CURVE_SECP256R1]
+    assert c is not None
+    self.assertIsNotNone(c._cc_engine)
+    rng = random.Random(20261105)
+    max_diff = 2**16
+    base_a = rng.randint(2**80, int(c.n) - 2**80)
+    base_b = rng.randint(2**80, int(c.n) - 2**80)
+    base_other = rng.randint(2**80, int(c.n) - 2**80)
+    unrelated_1 = rng.randint(2**80, int(c.n) - 2**80)
+    unrelated_2 = rng.randint(2**80, int(c.n) - 2**80)
+
+    other_points = [c.Multiply(c.g, base_other)]
+    privs = [
+        base_a,  # 0: matches idx 1 (+65535)
+        base_a + max_diff - 1,  # 1: boundary +max_diff - 1
+        base_b,  # 2: matches idx 3 (-65535)
+        base_b - (max_diff - 1),  # 3: boundary -(max_diff - 1)
+        base_other - 42,  # 4: matches other_points[0]
+        unrelated_1,  # 5: duplicate with idx 6 -> must NOT match
+        unrelated_1,  # 6: duplicate with idx 5 -> must NOT match
+        unrelated_2,  # 7: diff == +max_diff with idx 8 -> out of range
+        unrelated_2 + max_diff,  # 8: out of range
+        1,  # 9: baby step hits INFINITY (1*G - 1*G), matches idx 10
+        2,  # 10: matches idx 9 (+1)
+        base_a,  # 11: duplicate weak key (same as idx 0) -> must match idx 1
+    ]
+    points = [c.Multiply(c.g, d) for d in privs]
+
+    res_cc = c.BatchDLOfDifferences(points, other_points, max_diff)
+    expected_matched = [
+        True,
+        True,
+        True,
+        True,
+        True,
+        False,
+        False,
+        False,
+        False,
+        True,
+        True,
+        True,
+    ]
+    self.assertEqual([r is not None for r in res_cc], expected_matched)
+
+    # Force multi-tile C++ DiffBatchDL execution and symmetric (no other_points)
+    # mode, verifying identical detection.
+    with mock.patch.object(ec_util, "_MAX_DIFF_CC_BABY_ENTRIES", 20):
+      res_cc_tiled = c.BatchDLOfDifferences(points, other_points, max_diff)
+      res_cc_sym = c.BatchDLOfDifferences(points, None, max_diff)
+    self.assertEqual(res_cc_tiled, res_cc)
+    expected_sym = expected_matched[:]
+    expected_sym[4] = False
+    self.assertEqual([r is not None for r in res_cc_sym], expected_sym)
+
+    # Verify both pure-Python fallback strategies (single-pass BSGS, tiled
+    # blocked-Bloom BSGS, and small-max_diff pairwise table lookup).
+    with mock.patch.object(c, "_cc_engine", None):
+      res_py_direct = c.BatchDLOfDifferences(points, other_points, max_diff)
+      self.assertEqual(res_py_direct, res_cc)
+
+      with (
+          mock.patch.object(ec_util, "_MAX_DIFF_DIRECT_BABY_ENTRIES", 1),
+          mock.patch.object(ec_util, "_DIFF_BLOOM_BYTES", 4096),
+          mock.patch.object(ec_util, "_DIFF_BLOOM_MAX_GIANT_PROBES", 1000),
+      ):
+        res_py_bloom = c.BatchDLOfDifferences(points, other_points, max_diff)
+      self.assertEqual(res_py_bloom, res_py_direct)
+
+      c.BatchDL([c.g], 2**12)
+      self.assertEqual(
+          c.BatchDLOfDifferences(
+              [c.Multiply(c.g, 10), c.Multiply(c.g, 10 + 16)], max_diff=16
+          ),
+          [None, None],
+      )
+      self.assertTrue(
+          all(
+              r is not None
+              for r in c.BatchDLOfDifferences(
+                  [c.Multiply(c.g, 10), c.Multiply(c.g, 10 + 15)], max_diff=16
+              )
+          )
+      )
+
+  def testCppAndPythonFallbackEquivalence(self):
+    for curve_type in (
+        paranoid_pb2.CurveType.CURVE_SECP256R1,
+        paranoid_pb2.CurveType.CURVE_SECP521R1,
+    ):
+      c = ec_util.CURVE_FACTORY[curve_type]
+      assert c is not None
+      self.assertIsNotNone(c._cc_engine)
+      order = int(c.n)
+      bits = c.n.bit_length()
+      dls = [
+          0,
+          1,
+          999,
+          order - 10,
+          order - 999,
+          (0x12345678 << 64) % order,
+          (((1 << bits) - 1) - (0xCAFEBABE << 32)) % order,
+      ]
+      pts = [c.Multiply(c.g, d) for d in dls] + [
+          c.Multiply(c.g, (1 << 120) + (1 << 60) + 12345),
+      ]
+      res_cc_dl = c.BatchDL(pts[:4], 2048)
+      res_cc_ext = c.ExtendedBatchDL(pts)
+      with mock.patch.object(c, "_cc_engine", None):
+        res_py_dl = c.BatchDL(pts[:4], 2048)
+        res_py_ext = c.ExtendedBatchDL(pts)
+      self.assertEqual(res_cc_dl, res_py_dl)
+      self.assertEqual(res_cc_ext, res_py_ext)
+      self.assertEqual(res_cc_ext[:-1], dls)
+      self.assertIsNone(res_cc_ext[-1])
 
   @parameterized.named_parameters(*curves)
   def testHiddenNumberParams(self, c: ec_util.EcCurve):

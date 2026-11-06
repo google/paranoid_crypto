@@ -101,27 +101,25 @@ class CheckWeakCurve(base_check.ECKeyCheck):
 class CheckWeakECPrivateKey(base_check.ECKeyCheck):
   """Checks if any keys use a weak private key.
 
-  This method checks whether there are any keys where the private key is
-  of one of the following forms:
-    (1) only the 32 least significant bits are set.
-    (2) only the 32 most significant bits are set.
-    (3) all 32 bit words of the private key are the same.
+  This method checks whether there are any keys where the private key has one
+  of the following low-entropy forms (modulo the curve order n):
+    (1) only 4 contiguous bytes (or the 32 most significant bits) are non-zero
+        in a 0x00-padded buffer.
+    (2) only 4 contiguous bytes (or the 32 most significant bits) differ from
+        0xff in an erased-flash / 0xff-padded buffer, or the key comes from a
+        two's-complement sign-extended negative 32-bit integer.
+    (3) the private key is a small negative 32-bit integer reduced modulo n.
+    (4) the private key is a repetition of a constant 32-bit word.
 
   The test is motivated by some research that found such weak keys
   https://www.securityevaluators.com/casestudies/ethercombing/
 
-  An observation used in the method below is that it is sufficient to
-  solve DLs for the 32 least significant bits. A point of form (2) can be
-  converted into a point of form (1) by a point multiplication with
-  2^(-curve.bit_length() + 32) modulo the order of the curve.
-  A point of form (3) can be converted into a point of form (1) by
-  multiplying it with the modular inverse of (1 + 2^32 + 2^64 + ...).
+  All candidate forms are reduced to solving 32-bit discrete logarithms via
+  EcCurve.ExtendedBatchDL, reusing the byte-shifted points from form (1) to
+  construct the 0xff-complement targets via a single affine BatchAdd per shift
+  without additional scalar multiplications.
 
-  The method uses two steps. Step 1 generated a list of points with all
-  the conversions. Step 2 performs a baby step giant step algorithm with
-  all the generated points.
-
-  The time and memory complexity of the methods is
+  The time and memory complexity of the method is
      O(sqrt(#forms * #keys * 2^32))
   """
 

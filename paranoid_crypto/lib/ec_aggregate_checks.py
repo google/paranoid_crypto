@@ -29,7 +29,7 @@ class CheckECKeySmallDifference(base_check.ECKeyCheck):
   generation, that generated the keys is badly broken.
   """
 
-  def __init__(self, max_diff: int = 2**8):
+  def __init__(self, max_diff: int = 2**16):
     """CheckECKeySmallDifference check constructor.
 
     Args:
