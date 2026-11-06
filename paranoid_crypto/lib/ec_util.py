@@ -63,21 +63,8 @@ Coordinate = Optional[int]
 EcPoint = Union[tuple[int, int], tuple[None, None]]
 EcPointJacobian = tuple[int, int, int]
 
-# Upper bound on automatic baby-step table growth in BatchDL so per-curve
-# tables fit in a 2**22-slot dict (~290 MiB) instead of growing unboundedly.
-_MAX_DL_TABLE_SIZE = 2_750_000
-
-# Threshold on baby-step table entries in BatchDLOfDifferences before switching
-# from a single-pass dict (~145 MiB max) to a 128 MiB blocked-Bloom BSGS pass.
-_MAX_DIFF_DIRECT_BABY_ENTRIES = 1_350_000
-_DIFF_BLOOM_BYTES = 1 << 27  # 128 MiB (33,554,432 uint32 words)
-_DIFF_BLOOM_MAX_GIANT_PROBES = 96_000_000
-_BLOOM32_TAG = tuple((1 << (i & 31)) | (1 << (i >> 5)) for i in range(1024))
-
 # Default upper bound on baby-step entries per tile in C++ DiffBatchDL.
-_MAX_DIFF_CC_BABY_ENTRIES = getattr(
-    ec_batch, "DEFAULT_MAX_DIFF_BABY_ENTRIES", 36_000_000
-)
+_MAX_DIFF_CC_BABY_ENTRIES = int(ec_batch.DEFAULT_MAX_DIFF_BABY_ENTRIES)
 
 
 def _PackPointsLE(
@@ -149,26 +136,21 @@ class EcCurve:
     # These results are used for batch multiplications.
     self._cache = {}
 
-    # A compact lookup table mapping hash(x) -> int | list[int] for the
-    # x-coordinates of the points self.g * i for 0 <= i < self._table_size.
-    self._table: dict[int, Union[int, list[int]]] = {}
-    self._table_size = 0
     self._coord_bytes = max(1, (int(self.mod).bit_length() + 7) // 8)
-    self._cc_engine = None
-    if (
-        ec_batch is not None
-        and self._coord_bytes <= 1024
-        and int(self.mod) >= 5
-        and (int(self.mod) & 1) == 1
-    ):
-      gx_int = int(self.g[0] % self.mod)
-      gy_int = int(self.g[1] % self.mod)
-      self._cc_engine = ec_batch.EcBatchEngine.Create(
-          int(self.mod).to_bytes(self._coord_bytes, "little"),
-          int(self.a % self.mod).to_bytes(self._coord_bytes, "little"),
-          gx_int.to_bytes(self._coord_bytes, "little"),
-          gy_int.to_bytes(self._coord_bytes, "little"),
+    gx_int = int(self.g[0] % self.mod)
+    gy_int = int(self.g[1] % self.mod)
+    cc_engine = ec_batch.EcBatchEngine.Create(
+        int(self.mod).to_bytes(self._coord_bytes, "little"),
+        int(self.a % self.mod).to_bytes(self._coord_bytes, "little"),
+        gx_int.to_bytes(self._coord_bytes, "little"),
+        gy_int.to_bytes(self._coord_bytes, "little"),
+    )
+    if cc_engine is None:
+      raise ValueError(
+          "Unsupported curve modulus for EcBatchEngine (requires an odd prime"
+          " >= 5 with coordinate size <= 1024 bytes)."
       )
+    self._cc_engine = cc_engine
 
   def OnCurve(self, p: EcPoint) -> bool:
     """Checks whether the point p is on the curve.
@@ -705,63 +687,6 @@ class EcCurve:
         diffs[i] = self.Subtract(p, q)[0]  # pyrefly: ignore[unsupported-operation]
     return sums, diffs  # pyrefly: ignore[bad-return]
 
-  def _BatchMultiAddSubtractX(
-      self, pts: list[EcPoint], seq: list[EcPoint]
-  ) -> list[tuple[list[Coordinate], list[Coordinate]]]:
-    """Computes BatchAddSubtractX(p, seq) for multiple points with one inverse.
-
-    Args:
-      pts: points to add/subtract against seq.
-      seq: sequence of curve points.
-
-    Returns:
-      A list of (sums, diffs) x-coordinate lists matching
-      [self.BatchAddSubtractX(p, seq) for p in pts].
-    """
-    if not pts:
-      return []
-    seq_len = len(seq)
-    if not seq_len:
-      return [([], []) for _ in pts]
-    mod = self.mod
-    seq_x = [q[0] for q in seq]
-    seq_y = [q[1] for q in seq]
-    diffs_x: list[Coordinate] = [None] * (len(pts) * seq_len)
-    for i, p in enumerate(pts):
-      if p != INFINITY:
-        px = p[0]
-        base_idx = i * seq_len
-        for k in range(seq_len):
-          qx = seq_x[k]
-          if qx is not None:
-            diffs_x[base_idx + k] = (px - qx) % mod  # pyrefly: ignore[unsupported-operation]
-    invs = self.BatchInverse(diffs_x)
-    out: list[tuple[list[Coordinate], list[Coordinate]]] = []
-    for i, p in enumerate(pts):
-      if p == INFINITY:
-        out.append((seq_x[:], seq_x[:]))
-        continue
-      px, py = p
-      sums: list[Coordinate] = [None] * seq_len
-      diffs: list[Coordinate] = [None] * seq_len
-      base_idx = i * seq_len
-      for k in range(seq_len):
-        v = invs[base_idx + k]
-        if v:
-          qx = seq_x[k]
-          qy = seq_y[k]
-          sx = px + qx  # pyrefly: ignore[unsupported-operation]
-          t = v * (py - qy) % mod  # pyrefly: ignore[unsupported-operation]
-          sums[k] = (t * t - sx) % mod
-          t = v * (py + qy) % mod  # pyrefly: ignore[unsupported-operation]
-          diffs[k] = (t * t - sx) % mod
-        else:
-          q = seq[k]
-          sums[k] = self.Add(p, q)[0]
-          diffs[k] = self.Subtract(p, q)[0]
-      out.append((sums, diffs))
-    return out
-
   def BatchMultiplyG(self, scalars: list[int]) -> list[EcPoint]:
     """Multiplies the generator of this curve by a list of integers.
 
@@ -866,60 +791,6 @@ class EcCurve:
         res[sums[j]] = center + j + 1
     return res
 
-  def _EnsureTable(self, target_size: int) -> None:
-    """Grows self._table so it covers [0, target_size) keyed by hash(x)."""
-    start = self._table_size
-    count = target_size - start
-    if count <= 0:
-      return
-    base = self.g
-    table = self._table
-    table_get = table.get
-    _hash = hash
-
-    def _Put(x: Coordinate, idx: int) -> None:
-      hx = _hash(x)
-      prev = table_get(hx)
-      if prev is None:
-        table[hx] = idx
-      elif isinstance(prev, list):
-        prev.append(idx)
-      elif prev != idx:
-        table[hx] = [prev, idx]
-
-    if count <= 2:
-      for idx in range(start, target_size):
-        _Put(self.Multiply(base, idx)[0], idx)
-      self._table_size = target_size
-      return
-
-    h = max(1, int(math.sqrt(count // 2)))
-    m = 2 * h + 1
-    r = (count + m - 1) // m
-    sequence_low = self.PointSequence(base, h + 1)[1:]
-    step_jac = self.AffineToJacobian(self.Multiply(base, m))
-    if start == 0:
-      first_high = self.AffineToJacobian(sequence_low[h - 1])  # pyrefly: ignore[bad-argument-type]
-    else:
-      first_high = self.AffineToJacobian(self.Multiply(base, start + h))
-    high_jac: list[EcPointJacobian] = [first_high]
-    for i in range(1, r):
-      high_jac.append(self.AddJacobian(high_jac[i - 1], step_jac))
-    sequence_high = self.BatchJacobianToAffine(high_jac)
-    del high_jac
-    sub_size = max(1, 4096 // max(1, h))
-    for sub_start in range(0, r, sub_size):
-      sub_high = sequence_high[sub_start : sub_start + sub_size]
-      add_sub_res = self._BatchMultiAddSubtractX(sub_high, sequence_low)  # pyrefly: ignore[bad-argument-type]
-      for off, p in enumerate(sub_high):
-        center = start + (sub_start + off) * m + h
-        _Put(p[0], center)
-        sums, diffs = add_sub_res[off]
-        for j in range(h):
-          _Put(diffs[j], center - j - 1)
-          _Put(sums[j], center + j + 1)
-    self._table_size = start + r * m
-
   def BatchDL(
       self,
       points: list[EcPoint],
@@ -943,98 +814,23 @@ class EcCurve:
     Returns:
        The result is a list that either contains the discrete logarithms
        or None if the DL could not be bound.
+
+    Raises:
+      ValueError: if n >= 2**62.
     """
     if not points or n <= 0:
       return [None] * len(points)
+    if n >= (1 << 62):
+      raise ValueError("DL upper bound n must be < 2**62")
     target_count = (
         expected_points if expected_points is not None else len(points)
     )
-    if self._cc_engine is not None and n < (1 << 62):
-      packed = _PackPointsLE(points, self._coord_bytes, self.mod)
-      hits = self._cc_engine.BatchDL(packed, int(n), int(target_count))
-      res_cc: list[Optional[int]] = [None] * len(points)
-      order = int(self.n)
-      for idx, signed_dl in hits:
-        res_cc[idx] = int(signed_dl % order)
-      return res_cc
-    table_size = min(
-        _MAX_DL_TABLE_SIZE,
-        max(1, int(math.sqrt(n * max(1, target_count) // 2))),
-    )
-    base = self.g
-    if table_size > self._table_size:
-      self._EnsureTable(table_size)
-    table_size = self._table_size
-    # Computes the size of a giant step. This size can be about twice the size
-    # of the table above, since the coordinate x in a table represents both
-    # a point and its inverse.
-    t = 2 * table_size - 1
-    # The number of giant steps needs to be 2 larger than n // t, once to offset
-    # rounding and once to adjust for the fact that DL might be a difference
-    # between a giant step and a baby step.
-    giant_steps = 2 + n // t
-    table_get = self._table.get
-    _hash = hash
+    packed = _PackPointsLE(points, self._coord_bytes, self.mod)
+    hits = self._cc_engine.BatchDL(packed, int(n), int(target_count))
     res: list[Optional[int]] = [None] * len(points)
-    if giant_steps <= 2:
-      list_c = self.PointSequence(self.Multiply(base, -t), giant_steps)
-      for i, p in enumerate(points):
-        if p == INFINITY:
-          res[i] = 0
-          continue
-        for j, x in enumerate(self.BatchAddX(p, list_c)):  # pyrefly: ignore[bad-argument-type]
-          tb_val = table_get(_hash(x))
-          if tb_val is not None:
-            for tb_x in tb_val if isinstance(tb_val, list) else (tb_val,):
-              for dl in (j * t + tb_x, j * t - tb_x):
-                y = self.Multiply(base, dl)
-                if y[0] == p[0]:
-                  if y[1] == p[1]:
-                    res[i] = int(dl % self.n)
-                  elif y[1] == -p[1] % self.mod:  # pyrefly: ignore[unsupported-operation]
-                    res[i] = int((-dl) % self.n)
-      return res
-
-    h = giant_steps // 2
-    shift_pt = self.Multiply(base, -h * t)
-    list_c = self.PointSequence(self.Multiply(base, t), h + 1)[1:]
-    dl_chunk_size = 4096
-    sub_size = max(1, 4096 // max(1, h))
-    for start in range(0, len(points), dl_chunk_size):
-      p_chunk = points[start : start + dl_chunk_size]
-      shifted_points = self.BatchAdd(shift_pt, p_chunk)
-      for sub_start in range(0, len(p_chunk), sub_size):
-        sub_pts = p_chunk[sub_start : sub_start + sub_size]
-        sub_shifted = shifted_points[sub_start : sub_start + sub_size]
-        add_sub_res = self._BatchMultiAddSubtractX(sub_shifted, list_c)  # pyrefly: ignore[bad-argument-type]
-        for off, p in enumerate(sub_pts):
-          out_idx = start + sub_start + off
-          if p == INFINITY:
-            res[out_idx] = 0
-            continue
-          pc = sub_shifted[off]
-          sums, diffs = add_sub_res[off]
-          candidates: list[tuple[int, Union[int, list[int]]]] = []
-          tb_val = table_get(_hash(pc[0]))
-          if tb_val is not None:
-            candidates.append((h, tb_val))
-          for k, xk in enumerate(sums):
-            tb_val = table_get(_hash(xk))
-            if tb_val is not None:
-              candidates.append((h - k - 1, tb_val))
-          for k, xk in enumerate(diffs):
-            tb_val = table_get(_hash(xk))
-            if tb_val is not None:
-              candidates.append((h + k + 1, tb_val))
-          for j, tb_val in candidates:
-            for tb_x in tb_val if isinstance(tb_val, list) else (tb_val,):
-              for dl in (j * t + tb_x, j * t - tb_x):
-                y = self.Multiply(base, dl)
-                if y[0] == p[0]:
-                  if y[1] == p[1]:
-                    res[out_idx] = int(dl % self.n)
-                  elif y[1] == -p[1] % self.mod:  # pyrefly: ignore[unsupported-operation]
-                    res[out_idx] = int((-dl) % self.n)
+    order = int(self.n)
+    for idx, signed_dl in hits:
+      res[idx] = int(signed_dl % order)
     return res
 
   def ExtendedBatchDL(self, points: list[EcPoint]) -> list[Optional[int]]:
@@ -1081,8 +877,7 @@ class EcCurve:
       else:
         non_inf_indices.append(idx)
         non_inf_points.append(pt)
-    num_valid = len(non_inf_points)
-    if not num_valid:
+    if not non_inf_points:
       return res
 
     # Search for DLs built from u * multipliers[j] with 0 <= u < 2**32.
@@ -1104,35 +899,6 @@ class EcCurve:
       multipliers.append(sum(1 << (32 * i) for i in range(j)))
     inverses = [int(gmpy.invert(m, self.n)) for m in multipliers]
 
-    # Precompute width-2 NAF for the scalars we need to multiply directly:
-    # j = num_byte_shifts - 1 (if num_byte_shifts > 1) and j >= num_byte_shifts.
-    # All intermediate byte-shift indices 1 <= j < num_byte_shifts - 1 are
-    # obtained from j + 1 by 8 Jacobian doublings since
-    # (2**(8*j))**-1 = 2**8 * (2**(8*(j+1)))**-1.
-    direct_indices = (
-        [num_byte_shifts - 1] if num_byte_shifts > 1 else []
-    ) + list(range(num_byte_shifts, len(multipliers)))
-    naf_scalars = []
-    max_naf_bit = 0
-    for idx in direct_indices:
-      s = inverses[idx]
-      pos_bits = []
-      neg_bits = []
-      b = 0
-      while s > 0:
-        if s & 1:
-          if (s & 3) == 3:
-            neg_bits.append(b)
-            s += 1
-          else:
-            pos_bits.append(b)
-            s -= 1
-          if b > max_naf_bit:
-            max_naf_bit = b
-        s >>= 1
-        b += 1
-      naf_scalars.append((idx, pos_bits, neg_bits))
-
     # Precompute C_{B, m} = ((B * m^(-1)) % n) * G for 0xff-padded /
     # sign-extended buffers (both bit-masked 2**bits - 1 and unmasked
     # 2**byte_bits - 1 when byte_bits != bits).
@@ -1148,141 +914,35 @@ class EcCurve:
         comp_scalars.append((base_val * inverses[m_idx]) % order)
     comp_points = self.BatchMultiplyG(comp_scalars)
 
-    if self._cc_engine is not None:
-      scalar_bytes = max(1, (bits + 7) // 8)
-      inv_packed = b"".join(
-          inv.to_bytes(scalar_bytes, "little") for inv in inverses
-      )
-      pts_packed = _PackPointsLE(non_inf_points, self._coord_bytes, self.mod)
-      comp_packed = _PackPointsLE(comp_points, self._coord_bytes, self.mod)
-      hits = self._cc_engine.ExtendedBatchDL(
-          pts_packed,
-          inv_packed,
-          scalar_bytes,
-          num_byte_shifts,
-          num_window_mults,
-          comp_packed,
-      )
-      for key_i, kind, aux_idx, dlog in hits:
-        if kind == 0:
-          cand = int(dlog % order)
-        elif kind == 1:
-          cand = int((dlog * multipliers[aux_idx]) % order)
-        elif kind == 2:
-          cand = int((-dlog) % order)
-        else:
-          b_idx = aux_idx // num_window_mults
-          m_idx = aux_idx % num_window_mults
-          cand = int((comp_bases[b_idx] - dlog * multipliers[m_idx]) % order)
-        orig_idx = non_inf_indices[key_i]
-        if res[orig_idx] is None:
-          if self.Multiply(self.g, cand) == non_inf_points[key_i]:
-            res[orig_idx] = cand
-      return res
-
-    mod = self.mod
-    num_mult = len(multipliers)
-    num_extra = num_mult - 1
-    expected_total = num_mult * num_valid
-    key_chunk_size = 2048
-    jac_sub_size = 256
-
-    for v_start in range(0, num_valid, key_chunk_size):
-      v_chunk = non_inf_points[v_start : v_start + key_chunk_size]
-      c_len = len(v_chunk)
-      affine_extra: list[EcPoint] = []
-      for sub_start in range(0, c_len, jac_sub_size):
-        sub_pts = v_chunk[sub_start : sub_start + jac_sub_size]
-        jac_chunk = [INFINITY_JACOBIAN] * (len(sub_pts) * num_extra)
-        for c_i, point in enumerate(sub_pts):
-          base_off = c_i * num_extra
-          cur = self.AffineToJacobian(point)
-          d_pos = [None] * (max_naf_bit + 1)
-          d_neg = [None] * (max_naf_bit + 1)
-          for b in range(max_naf_bit + 1):
-            d_pos[b] = cur  # pyrefly: ignore[unsupported-operation]
-            d_neg[b] = (cur[0], (-cur[1]) % mod, cur[2])  # pyrefly: ignore[unsupported-operation]
-            if b < max_naf_bit:
-              cur = self.DoubleJacobian(cur)
-
-          for idx, pos_bits, neg_bits in naf_scalars:
-            acc = d_pos[pos_bits[0]]
-            for b in pos_bits[1:]:
-              acc = self.AddJacobian(acc, d_pos[b])  # pyrefly: ignore[bad-argument-type]
-            for b in neg_bits:
-              acc = self.AddJacobian(acc, d_neg[b])  # pyrefly: ignore[bad-argument-type]
-            jac_chunk[base_off + idx - 1] = acc  # pyrefly: ignore[unsupported-operation]
-
-          if num_byte_shifts > 2:
-            acc = jac_chunk[base_off + num_byte_shifts - 2]
-            for j in range(num_byte_shifts - 2, 0, -1):
-              for _ in range(8):
-                acc = self.DoubleJacobian(acc)
-              jac_chunk[base_off + j - 1] = acc
-        affine_extra.extend(self.BatchJacobianToAffine(jac_chunk))
-        del jac_chunk
-
-      neg_window_lists: list[list[EcPoint]] = [
-          [self.Negate(p) for p in v_chunk]
-      ]
-      for m_idx in range(1, num_window_mults):
-        off = m_idx - 1
-        neg_window_lists.append([
-            self.Negate(affine_extra[i * num_extra + off]) for i in range(c_len)
-        ])
-
-      # Layout of chunk_targets:
-      # 1. [0 .. c_len): v_chunk (m_idx = 0)
-      # 2. [c_len .. c_len * num_mult): affine_extra (m_idx = 1..num_mult-1)
-      # 3. [c_len * num_mult .. c_len * (num_mult + 1)): -v_chunk
-      # 4. Remaining slices of c_len: C_{B, m_idx} - Q_{i, m_idx}
-      chunk_targets: list[EcPoint] = []
-      chunk_targets.extend(v_chunk)
-      chunk_targets.extend(affine_extra)
-      chunk_targets.extend(neg_window_lists[0])
-      for b_idx in range(len(comp_bases)):
-        c_base_off = b_idx * num_window_mults
-        for m_idx in range(num_window_mults):
-          chunk_targets.extend(
-              self.BatchAdd(
-                  comp_points[c_base_off + m_idx], neg_window_lists[m_idx]
-              )
-          )
-      del affine_extra
-      del neg_window_lists
-
-      discrete_logs = self.BatchDL(
-          chunk_targets, 2**32, expected_points=expected_total
-      )
-      del chunk_targets
-
-      extra_end = c_len * num_mult
-      neg_end = extra_end + c_len
-      for k, dlog in enumerate(discrete_logs):
-        if dlog is None:
-          continue
-        if k < c_len:
-          i = k
-          cand = int(dlog % order)
-        elif k < extra_end:
-          rel = k - c_len
-          i = rel // num_extra
-          m_idx = (rel % num_extra) + 1
-          cand = int((dlog * multipliers[m_idx]) % order)
-        elif k < neg_end:
-          i = k - extra_end
-          cand = int((-dlog) % order)
-        else:
-          rel = k - neg_end
-          slice_idx = rel // c_len
-          i = rel % c_len
-          b_idx = slice_idx // num_window_mults
-          m_idx = slice_idx % num_window_mults
-          cand = int((comp_bases[b_idx] - dlog * multipliers[m_idx]) % order)
-        orig_idx = non_inf_indices[v_start + i]
-        if res[orig_idx] is None:
-          if self.h == 1 or self.Multiply(self.g, cand) == v_chunk[i]:
-            res[orig_idx] = cand
+    scalar_bytes = max(1, (bits + 7) // 8)
+    inv_packed = b"".join(
+        inv.to_bytes(scalar_bytes, "little") for inv in inverses
+    )
+    pts_packed = _PackPointsLE(non_inf_points, self._coord_bytes, self.mod)
+    comp_packed = _PackPointsLE(comp_points, self._coord_bytes, self.mod)
+    hits = self._cc_engine.ExtendedBatchDL(
+        pts_packed,
+        inv_packed,
+        scalar_bytes,
+        num_byte_shifts,
+        num_window_mults,
+        comp_packed,
+    )
+    for key_i, kind, aux_idx, dlog in hits:
+      if kind == 0:
+        cand = int(dlog % order)
+      elif kind == 1:
+        cand = int((dlog * multipliers[aux_idx]) % order)
+      elif kind == 2:
+        cand = int((-dlog) % order)
+      else:
+        b_idx = aux_idx // num_window_mults
+        m_idx = aux_idx % num_window_mults
+        cand = int((comp_bases[b_idx] - dlog * multipliers[m_idx]) % order)
+      orig_idx = non_inf_indices[key_i]
+      if res[orig_idx] is None:
+        if self.Multiply(self.g, cand) == non_inf_points[key_i]:
+          res[orig_idx] = cand
     return res
 
   def BatchDLOfDifferences(
@@ -1298,8 +958,7 @@ class EcCurve:
     p - q = k * G with abs(k) < max_diff.
 
     The complexity of this test is
-    O(min(max_diff + len(points) * (len(other_points) + len(points) // 2),
-          (len(points) + len(other_points)) * sqrt(max_diff)))
+    O((len(points) + len(other_points)) * sqrt(max_diff)).
 
     Args:
       points: the points of the public keys being tested.
@@ -1313,343 +972,52 @@ class EcCurve:
       is not None, then the discrete log between this key and another
       key has been found and this i-th element is a string describing the
       relation.
+
+    Raises:
+      ValueError: if max_diff >= 2**62.
     """
     if other_points is None:
       other_points = []
     res: list[Optional[str]] = [None] * len(points)
-    # Avoids to generate a table when there is nothing to test.
+    # Avoids generating a table when there is nothing to test.
     if not points or len(points) + len(other_points) < 2 or max_diff <= 1:
       return res
-    if self._cc_engine is not None and max_diff < (1 << 62):
-      pts_packed = _PackPointsLE(points, self._coord_bytes, self.mod)
-      other_packed = (
-          _PackPointsLE(other_points, self._coord_bytes, self.mod)
-          if other_points
-          else b""
-      )
-      hits = self._cc_engine.DiffBatchDL(
-          pts_packed,
-          other_packed,
-          int(max_diff),
-          int(_MAX_DIFF_CC_BABY_ENTRIES),
-      )
-      m_other_len = len(other_points)
-      for i, ref_idx, dl in hits:
-        p = points[i]
-        q = (
-            other_points[ref_idx]
-            if ref_idx < m_other_len
-            else points[ref_idx - m_other_len]
-        )
-        if p == q:
-          continue
-        px, py = p
-        qx, qy = q
-        if px is None or py is None or qx is None or qy is None:
-          continue
-        if self.Subtract(p, q) == self.Multiply(self.g, dl):
-          res[i] = "key - (%x, %x) = %d * G" % (qx, qy, dl)
-          if ref_idx >= m_other_len:
-            res[ref_idx - m_other_len] = "key - (%x, %x) = %d * G" % (
-                px,
-                py,
-                -dl,
-            )
-      return res
-    base = self.g
-    n_pts = len(points)
-    m_other = len(other_points)
-    h = max(1, int(math.sqrt(max_diff // 4)))
-    m = 2 * h + 1
-    r = (max_diff - 1 + h) // m
-    pairwise_cost = (
-        max(0, max_diff - self._table_size) // 2
-        + n_pts * m_other
-        + n_pts * (n_pts - 1) // 2
+    if max_diff >= (1 << 62):
+      raise ValueError("max_diff must be < 2**62")
+    pts_packed = _PackPointsLE(points, self._coord_bytes, self.mod)
+    other_packed = (
+        _PackPointsLE(other_points, self._coord_bytes, self.mod)
+        if other_points
+        else b""
     )
-    bsgs_cost = h + r + (n_pts + m_other - 1) * h + n_pts * r
-    if bsgs_cost < pairwise_cost:
-      total_baby_pts = m_other + max(0, n_pts - 1)
-      if total_baby_pts * (2 * h + 1) <= _MAX_DIFF_DIRECT_BABY_ENTRIES:
-        seq_baby = self.PointSequence(base, h + 1)[1:]
-        seq_giant = (
-            self.PointSequence(self.Multiply(base, m), r + 1)[1:] if r else []
-        )
-        baby_table: dict[int, int | list[int]] = {}
-        baby_get = baby_table.get
-        _hash = hash
-        shift = (2 * h + 1).bit_length()
-        mask = (1 << shift) - 1
-
-        def InsertBaby(x: Coordinate, entry: int):
-          key = _hash(x)
-          existing = baby_get(key)
-          if existing is None:
-            baby_table[key] = entry
-          elif isinstance(existing, list):
-            existing.append(entry)
-          else:
-            baby_table[key] = [existing, entry]
-
-        other_chunk = max(1, 4096 // max(1, h))
-        for start in range(0, m_other, other_chunk):
-          sub_other = other_points[start : start + other_chunk]
-          baby_res = self._BatchMultiAddSubtractX(sub_other, seq_baby)  # pyrefly: ignore[bad-argument-type]
-          for off, q in enumerate(sub_other):
-            idx_prefix = (start + off) << shift
-            InsertBaby(q[0], idx_prefix | h)
-            sums, diffs = baby_res[off]
-            for k in range(h):
-              b = k + 1
-              InsertBaby(sums[k], idx_prefix | (h + b))
-              InsertBaby(diffs[k], idx_prefix | (h - b))
-
-        pt_chunk = max(1, 4096 // max(1, h, r))
-        for start in range(0, n_pts, pt_chunk):
-          sub_pts = points[start : start + pt_chunk]
-          giant_res = (
-              self._BatchMultiAddSubtractX(sub_pts, seq_giant)  # pyrefly: ignore[bad-argument-type]
-              if r
-              else None
-          )
-          baby_pts = sub_pts if start + len(sub_pts) < n_pts else sub_pts[:-1]
-          baby_res = (
-              self._BatchMultiAddSubtractX(baby_pts, seq_baby)  # pyrefly: ignore[bad-argument-type]
-              if baby_pts
-              else []
-          )
-          for off, p in enumerate(sub_pts):
-            i = start + off
-            giant_steps = [(0, p[0])]
-            if giant_res is not None:
-              g_sums, g_diffs = giant_res[off]
-              for k in range(r):
-                g = k + 1
-                giant_steps.append((g, g_diffs[k]))
-                giant_steps.append((-g, g_sums[k]))
-            for g, x in giant_steps:
-              matches = baby_get(_hash(x))
-              if matches is not None:
-                for entry in (
-                    matches if isinstance(matches, list) else (matches,)
-                ):
-                  pt_idx = entry >> shift
-                  b = (entry & mask) - h
-                  q = (
-                      other_points[pt_idx]
-                      if pt_idx < m_other
-                      else points[pt_idx - m_other]
-                  )
-                  if p == q:
-                    continue
-                  dl = g * m + b
-                  if -max_diff < dl < max_diff:
-                    if self.Subtract(p, q) == self.Multiply(base, dl):
-                      res[i] = "key - (%x, %x) = %d * G" % (q[0], q[1], dl)  # pyrefly: ignore[unsupported-operation]
-                      if pt_idx >= m_other:
-                        res[pt_idx - m_other] = "key - (%x, %x) = %d * G" % (  # pyrefly: ignore[unsupported-operation]
-                            p[0],
-                            p[1],
-                            -dl,
-                        )
-            if off < len(baby_res):
-              idx_prefix = (m_other + i) << shift
-              InsertBaby(p[0], idx_prefix | h)
-              sums, diffs = baby_res[off]
-              for k in range(h):
-                b = k + 1
-                InsertBaby(sums[k], idx_prefix | (h + b))
-                InsertBaby(diffs[k], idx_prefix | (h - b))
-        return res
-
-      # Large-batch bounded-memory BSGS: a fixed 128 MiB uint32 blocked Bloom
-      # filter over giant-step x-coordinates filters >99.6% of non-matching baby
-      # steps so the survivor dict stays small even for hundreds of thousands of
-      # keys.
-      h = max(1, int(math.sqrt(max_diff)))
-      m = 2 * h + 1
-      r = (max_diff - 1 + h) // m
-      seq_baby = self.PointSequence(base, h + 1)[1:]
-      seq_giant = (
-          self.PointSequence(self.Multiply(base, m), r + 1)[1:] if r else []
+    hits = self._cc_engine.DiffBatchDL(
+        pts_packed,
+        other_packed,
+        int(max_diff),
+        int(_MAX_DIFF_CC_BABY_ENTRIES),
+    )
+    m_other_len = len(other_points)
+    for i, ref_idx, dl in hits:
+      p = points[i]
+      q = (
+          other_points[ref_idx]
+          if ref_idx < m_other_len
+          else points[ref_idx - m_other_len]
       )
-      shift = (2 * h + 1).bit_length()
-      mask = (1 << shift) - 1
-      pts_per_tile = max(1, _DIFF_BLOOM_MAX_GIANT_PROBES // (2 * r + 1))
-      g_chunk = max(1, 4096 // max(1, r))
-      b_chunk = max(1, 4096 // max(1, h))
-      tag_1024 = _BLOOM32_TAG
-      _hash = hash
-
-      for t_start in range(0, n_pts, pts_per_tile):
-        t_end = min(n_pts, t_start + pts_per_tile)
-        bloom = bytearray(_DIFF_BLOOM_BYTES)
-        mv = memoryview(bloom).cast("I")
-        mv_mask = len(mv) - 1
-
-        for start in range(t_start, t_end, g_chunk):
-          sub_pts = points[start : min(t_end, start + g_chunk)]
-          giant_res = (
-              self._BatchMultiAddSubtractX(sub_pts, seq_giant)  # pyrefly: ignore[bad-argument-type]
-              if r
-              else None
+      if p == q:
+        continue
+      px, py = p
+      qx, qy = q
+      if px is None or py is None or qx is None or qy is None:
+        continue
+      if self.Subtract(p, q) == self.Multiply(self.g, dl):
+        res[i] = "key - (%x, %x) = %d * G" % (qx, qy, dl)
+        if ref_idx >= m_other_len:
+          res[ref_idx - m_other_len] = "key - (%x, %x) = %d * G" % (
+              px,
+              py,
+              -dl,
           )
-          for off, p in enumerate(sub_pts):
-            hv = _hash(p[0])
-            mv[hv & mv_mask] |= (
-                tag_1024[(hv >> 25) & 1023] | tag_1024[(hv >> 35) & 1023]
-            )
-            if giant_res is not None:
-              g_sums, g_diffs = giant_res[off]
-              for k in range(r):
-                hv = _hash(g_diffs[k])
-                mv[hv & mv_mask] |= (
-                    tag_1024[(hv >> 25) & 1023] | tag_1024[(hv >> 35) & 1023]
-                )
-                hv = _hash(g_sums[k])
-                mv[hv & mv_mask] |= (
-                    tag_1024[(hv >> 25) & 1023] | tag_1024[(hv >> 35) & 1023]
-                )
-
-        survivors: dict[int, int | list[int]] = {}
-        surv_get = survivors.get
-
-        for idx_base, src_pts, src_limit in (
-            (0, other_points, m_other),
-            (m_other, points, max(0, t_end - 1)),
-        ):
-          for start in range(0, src_limit, b_chunk):
-            sub_b = src_pts[start : min(src_limit, start + b_chunk)]
-            baby_res = self._BatchMultiAddSubtractX(sub_b, seq_baby)  # pyrefly: ignore[bad-argument-type]
-            for off, q in enumerate(sub_b):
-              idx_prefix = (idx_base + start + off) << shift
-              hv = _hash(q[0])
-              w = mv[hv & mv_mask]
-              if w:
-                m1 = tag_1024[(hv >> 25) & 1023]
-                if (w & m1) == m1:
-                  m2 = tag_1024[(hv >> 35) & 1023]
-                  if (w & m2) == m2:
-                    existing = surv_get(hv)
-                    entry = idx_prefix | h
-                    if existing is None:
-                      survivors[hv] = entry
-                    elif isinstance(existing, list):
-                      existing.append(entry)
-                    else:
-                      survivors[hv] = [existing, entry]
-              sums, diffs = baby_res[off]
-              for k in range(h):
-                b = k + 1
-                hv = _hash(sums[k])
-                w = mv[hv & mv_mask]
-                if w:
-                  m1 = tag_1024[(hv >> 25) & 1023]
-                  if (w & m1) == m1:
-                    m2 = tag_1024[(hv >> 35) & 1023]
-                    if (w & m2) == m2:
-                      existing = surv_get(hv)
-                      entry = idx_prefix | (h + b)
-                      if existing is None:
-                        survivors[hv] = entry
-                      elif isinstance(existing, list):
-                        existing.append(entry)
-                      else:
-                        survivors[hv] = [existing, entry]
-                hv = _hash(diffs[k])
-                w = mv[hv & mv_mask]
-                if w:
-                  m1 = tag_1024[(hv >> 25) & 1023]
-                  if (w & m1) == m1:
-                    m2 = tag_1024[(hv >> 35) & 1023]
-                    if (w & m2) == m2:
-                      existing = surv_get(hv)
-                      entry = idx_prefix | (h - b)
-                      if existing is None:
-                        survivors[hv] = entry
-                      elif isinstance(existing, list):
-                        existing.append(entry)
-                      else:
-                        survivors[hv] = [existing, entry]
-
-        mv.release()
-        del mv
-        del bloom
-        if not survivors:
-          continue
-
-        for start in range(t_start, t_end, g_chunk):
-          sub_pts = points[start : min(t_end, start + g_chunk)]
-          giant_res = (
-              self._BatchMultiAddSubtractX(sub_pts, seq_giant)  # pyrefly: ignore[bad-argument-type]
-              if r
-              else None
-          )
-          for off, p in enumerate(sub_pts):
-            i = start + off
-            giant_steps = [(0, p[0])]
-            if giant_res is not None:
-              g_sums, g_diffs = giant_res[off]
-              for k in range(r):
-                g = k + 1
-                giant_steps.append((g, g_diffs[k]))
-                giant_steps.append((-g, g_sums[k]))
-            for g, x in giant_steps:
-              matches = surv_get(_hash(x))
-              if matches is not None:
-                for entry in (
-                    matches if isinstance(matches, list) else (matches,)
-                ):
-                  pt_idx = entry >> shift
-                  if pt_idx >= m_other + i:
-                    continue
-                  b = (entry & mask) - h
-                  q = (
-                      other_points[pt_idx]
-                      if pt_idx < m_other
-                      else points[pt_idx - m_other]
-                  )
-                  if p == q:
-                    continue
-                  dl = g * m + b
-                  if -max_diff < dl < max_diff:
-                    if self.Subtract(p, q) == self.Multiply(base, dl):
-                      res[i] = "key - (%x, %x) = %d * G" % (q[0], q[1], dl)  # pyrefly: ignore[unsupported-operation]
-                      if pt_idx >= m_other:
-                        res[pt_idx - m_other] = "key - (%x, %x) = %d * G" % (  # pyrefly: ignore[unsupported-operation]
-                            p[0],
-                            p[1],
-                            -dl,
-                        )
-        del survivors
-      return res
-
-    if max_diff > self._table_size:
-      self._EnsureTable(max_diff)
-    table_get = self._table.get
-    _hash = hash
-    negated = [self.Negate(q) for q in other_points]
-    for i, p in enumerate(points):
-      for j, x in enumerate(self.BatchAddX(p, negated)):
-        if x is None:
-          continue  # key is a duplicate
-        tb_val = table_get(_hash(x))
-        if tb_val is not None:
-          q_pt: Optional[EcPoint] = None
-          diff_pt: Optional[EcPoint] = None
-          for tb_x in tb_val if isinstance(tb_val, list) else (tb_val,):
-            if tb_x <= 0 or tb_x >= max_diff:
-              continue
-            if q_pt is None:
-              q_pt = self.Negate(negated[j])
-              diff_pt = self.Subtract(p, q_pt)
-            for dl in (tb_x, -tb_x):
-              if diff_pt == self.Multiply(base, dl):
-                res[i] = "key - (%x, %x) = %d * G" % (q_pt[0], q_pt[1], dl)  # pyrefly: ignore[unsupported-operation]
-                if j >= len(other_points):
-                  key2 = j - len(other_points)
-                  res[key2] = "key - (%x, %x) = %d * G" % (p[0], p[1], -dl)  # pyrefly: ignore[unsupported-operation]
-      negated.append(self.Negate(p))
     return res
 
   def TransformOrderLen(self, h: int, hlen: int) -> int:

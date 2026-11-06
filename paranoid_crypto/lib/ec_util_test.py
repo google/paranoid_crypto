@@ -321,67 +321,31 @@ class EcUtilTest(parameterized.TestCase):
     expected_sym[4] = False
     self.assertEqual([r is not None for r in res_cc_sym], expected_sym)
 
-    # Verify both pure-Python fallback strategies (single-pass BSGS, tiled
-    # blocked-Bloom BSGS, and small-max_diff pairwise table lookup).
-    with mock.patch.object(c, "_cc_engine", None):
-      res_py_direct = c.BatchDLOfDifferences(points, other_points, max_diff)
-      self.assertEqual(res_py_direct, res_cc)
+    # Verify exact strict-inequality boundary |dl| < max_diff for small bounds.
+    self.assertEqual(
+        c.BatchDLOfDifferences(
+            [c.Multiply(c.g, 10), c.Multiply(c.g, 10 + 16)], max_diff=16
+        ),
+        [None, None],
+    )
+    self.assertTrue(
+        all(
+            r is not None
+            for r in c.BatchDLOfDifferences(
+                [c.Multiply(c.g, 10), c.Multiply(c.g, 10 + 15)], max_diff=16
+            )
+        )
+    )
 
-      with (
-          mock.patch.object(ec_util, "_MAX_DIFF_DIRECT_BABY_ENTRIES", 1),
-          mock.patch.object(ec_util, "_DIFF_BLOOM_BYTES", 4096),
-          mock.patch.object(ec_util, "_DIFF_BLOOM_MAX_GIANT_PROBES", 1000),
-      ):
-        res_py_bloom = c.BatchDLOfDifferences(points, other_points, max_diff)
-      self.assertEqual(res_py_bloom, res_py_direct)
-
-      c.BatchDL([c.g], 2**12)
-      self.assertEqual(
-          c.BatchDLOfDifferences(
-              [c.Multiply(c.g, 10), c.Multiply(c.g, 10 + 16)], max_diff=16
-          ),
-          [None, None],
-      )
-      self.assertTrue(
-          all(
-              r is not None
-              for r in c.BatchDLOfDifferences(
-                  [c.Multiply(c.g, 10), c.Multiply(c.g, 10 + 15)], max_diff=16
-              )
-          )
-      )
-
-  def testCppAndPythonFallbackEquivalence(self):
-    for curve_type in (
-        paranoid_pb2.CurveType.CURVE_SECP256R1,
-        paranoid_pb2.CurveType.CURVE_SECP521R1,
-    ):
-      c = ec_util.CURVE_FACTORY[curve_type]
-      assert c is not None
-      self.assertIsNotNone(c._cc_engine)
-      order = int(c.n)
-      bits = c.n.bit_length()
-      dls = [
-          0,
-          1,
-          999,
-          order - 10,
-          order - 999,
-          (0x12345678 << 64) % order,
-          (((1 << bits) - 1) - (0xCAFEBABE << 32)) % order,
-      ]
-      pts = [c.Multiply(c.g, d) for d in dls] + [
-          c.Multiply(c.g, (1 << 120) + (1 << 60) + 12345),
-      ]
-      res_cc_dl = c.BatchDL(pts[:4], 2048)
-      res_cc_ext = c.ExtendedBatchDL(pts)
-      with mock.patch.object(c, "_cc_engine", None):
-        res_py_dl = c.BatchDL(pts[:4], 2048)
-        res_py_ext = c.ExtendedBatchDL(pts)
-      self.assertEqual(res_cc_dl, res_py_dl)
-      self.assertEqual(res_cc_ext, res_py_ext)
-      self.assertEqual(res_cc_ext[:-1], dls)
-      self.assertIsNone(res_cc_ext[-1])
+  def testOutOfRangeBoundsRaiseValueError(self):
+    c = ec_util.CURVE_FACTORY[paranoid_pb2.CurveType.CURVE_SECP256R1]
+    assert c is not None
+    with self.assertRaises(ValueError):
+      c.BatchDL([c.g], 1 << 62)
+    with self.assertRaises(ValueError):
+      c.BatchDLOfDifferences([c.g, c.Multiply(c.g, 2)], max_diff=1 << 62)
+    with self.assertRaises(ValueError):
+      ec_util.EcCurve("bad_even_mod", a=-3, b=1, mod=8, gx=1, gy=1, n=7)
 
   @parameterized.named_parameters(*curves)
   def testHiddenNumberParams(self, c: ec_util.EcCurve):
