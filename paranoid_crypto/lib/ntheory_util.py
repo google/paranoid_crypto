@@ -32,32 +32,6 @@ def FastProduct(values: list[int]) -> int:
   return values[0]
 
 
-def ExtendedProductTree(values: list[int]) -> tuple[list[list[int]], int]:
-  """Returns a product tree and a value T.
-
-  The value T is defined as T = sum(P//v for v in values), where P is the
-  product of values. T has the property that T % v == P // v % v for all
-  values v. This allows to do the BatchGCD without using squared moduli, so is
-  faster than the one presented in http://facthacks.cr.yp.to/batchgcd.html.
-
-  Args:
-    values: List of values to calculate the product.
-  """
-  prod_tree = [values]
-  t = [1] * len(values)
-  while len(values) > 1:
-    last_t = t[-1]
-    quadruplewise = zip(t[::2], t[1::2], values[::2], values[1::2])
-    t = [a * d + b * c for a, b, c, d in quadruplewise]
-    if len(values) % 2 == 1:
-      t.append(last_t)
-    pairwise = itertools.zip_longest(values[::2], values[1::2], fillvalue=1)
-    values = [a * b for a, b in pairwise]
-    prod_tree.append(values)
-
-  return prod_tree, t[0]
-
-
 def Inverse2exp(n: int, k: int) -> Optional[int]:
   """Computes the inverse of n modulo 2**k.
 

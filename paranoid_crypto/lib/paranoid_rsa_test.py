@@ -272,6 +272,19 @@ class ParanoidRSATest(paranoid_base_test.ParanoidBaseTest):
     self.assertFalse(check.Check([bad_rsa_gcd1, bad_rsa_gcd1]))
     self.assertTrue(check.Check(bad_rsa_keys_gcd))
 
+    # Empty input and malformed zero/one moduli do not poison valid keys.
+    self.assertFalse(check.Check([]))
+    zero_key = paranoid_pb2.RSAKey(
+        rsa_info=paranoid_pb2.RSAKeyInfo(n=b'\x00' * 32, e=b'\x01\x00\x01')
+    )
+    valid_coprime = paranoid_pb2.RSAKey(
+        rsa_info=paranoid_pb2.RSAKeyInfo(
+            n=util.Int2Bytes(101 * 103), e=b'\x01\x00\x01'
+        )
+    )
+    self.assertFalse(check.Check([zero_key, valid_coprime]))
+    self.assertResults([zero_key, valid_coprime], check.check_name, False)
+
   def testCheckGCDN1(self):
     # Weak keys.
     check = rsa_aggregate_checks.CheckGCDN1()
@@ -283,6 +296,20 @@ class ParanoidRSATest(paranoid_base_test.ParanoidBaseTest):
     self.assertFalse(
         check.Check([bad_rsa_shared_subprime1, bad_rsa_shared_subprime1]))
     self.assertTrue(check.Check(bad_rsa_keys_shared_subprime))
+
+    # Malformed n=1 (so n-1=0) does not crash or poison valid keys.
+    one_key = paranoid_pb2.RSAKey(
+        rsa_info=paranoid_pb2.RSAKeyInfo(
+            n=b'\x00' * 31 + b'\x01', e=b'\x01\x00\x01'
+        )
+    )
+    valid_coprime = paranoid_pb2.RSAKey(
+        rsa_info=paranoid_pb2.RSAKeyInfo(
+            n=util.Int2Bytes(101 * 103), e=b'\x01\x00\x01'
+        )
+    )
+    self.assertFalse(check.Check([one_key, valid_coprime]))
+    self.assertResults([one_key, valid_coprime], check.check_name, False)
 
   def testCheckROCA(self):
     check = rsa_single_checks.CheckROCA()

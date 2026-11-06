@@ -45,6 +45,15 @@ _EC_BATCH_CC_HEADERS = [
     'paranoid_crypto/lib/cc_util/ec_batch.h',
 ]
 
+_RSA_BATCH_CC_SOURCES = [
+    'paranoid_crypto/lib/cc_util/rsa_batch.cc',
+    'paranoid_crypto/lib/cc_util/pybind/rsa_batch.cc',
+]
+
+_RSA_BATCH_CC_HEADERS = [
+    'paranoid_crypto/lib/cc_util/rsa_batch.h',
+]
+
 
 def _get_extra_compile_args():
   """Return extra compiler flags.
@@ -78,6 +87,13 @@ _EXT_MODULES = [
         'paranoid_crypto.lib.cc_util.pybind.ec_batch',
         sources=_EC_BATCH_CC_SOURCES,
         depends=_EC_BATCH_CC_HEADERS,
+        include_dirs=['./'],
+        libraries=['gmp'],
+        cxx_std=17),
+    Pybind11Extension(
+        'paranoid_crypto.lib.cc_util.pybind.rsa_batch',
+        sources=_RSA_BATCH_CC_SOURCES,
+        depends=_RSA_BATCH_CC_HEADERS,
         include_dirs=['./'],
         libraries=['gmp'],
         cxx_std=17),

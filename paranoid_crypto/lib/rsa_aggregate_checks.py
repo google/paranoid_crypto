@@ -13,40 +13,99 @@
 # limitations under the License.
 """Module containing Paranoid checks on group of RSA keys by aggregation."""
 
+import abc
 from absl import logging
 import gmpy2 as gmpy
 from paranoid_crypto import paranoid_pb2
 from paranoid_crypto.lib import base_check
 from paranoid_crypto.lib import consts
-from paranoid_crypto.lib import rsa_util
 from paranoid_crypto.lib import util
+from paranoid_crypto.lib.cc_util.pybind import rsa_batch
+
+_MODULUS_INGEST_CHUNK = 65536
 
 
-class CheckGCD(base_check.RSAKeyCheck):
+class _RSABatchGCDCheck(base_check.RSAKeyCheck):
+  """Base class for C++-accelerated aggregate RSA batch-GCD checks."""
+
+  @property
+  @abc.abstractmethod
+  def _subtract_one(self) -> bool:
+    """Whether to compute GCD over `n - 1` instead of `n`."""
+
+  @property
+  @abc.abstractmethod
+  def _min_gcd_bytes(self) -> bytes:
+    """Big-endian unsigned lower bound for flagging a GCD hit."""
+
+  @abc.abstractmethod
+  def _RecordWeakKey(self, key: paranoid_pb2.RSAKey, gcd_val: int) -> None:
+    """Logs and attaches factor metadata for a flagged weak RSA key."""
+
+  def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
+    if not artifacts:
+      return False
+
+    acc = rsa_batch.RsaBatchAccumulator()
+    first_limb_bytes = (len(artifacts[0].rsa_info.n) + 7) & ~7
+    expected_limb_bytes = (
+        len(artifacts) * first_limb_bytes if first_limb_bytes <= 2048 else 0
+    )
+    acc.Reserve(len(artifacts), expected_limb_bytes)
+    sub_one = self._subtract_one
+    for start in range(0, len(artifacts), _MODULUS_INGEST_CHUNK):
+      chunk = [
+          key.rsa_info.n
+          for key in artifacts[start : start + _MODULUS_INGEST_CHUNK]
+      ]
+      acc.AddModulusBatch(chunk, sub_one)
+
+    hits = acc.ComputeFilteredGcds(self._min_gcd_bytes)
+    del acc
+
+    weak_gcds = {
+        idx: gmpy.mpz(int.from_bytes(gcd_be, "big")) for idx, gcd_be in hits
+    }
+    any_weak = bool(weak_gcds)
+    passed_result = self._CreateTestResult()
+    if not any_weak:
+      for key in artifacts:
+        util.SetTestResult(key.test_info, passed_result)
+      return False
+
+    for i, key in enumerate(artifacts):
+      gcd_val = weak_gcds.get(i)
+      if gcd_val is not None:
+        self._RecordWeakKey(key, gcd_val)
+        weak_result = self._CreateTestResult()
+        weak_result.result = True
+        util.SetTestResult(key.test_info, weak_result)
+      else:
+        util.SetTestResult(key.test_info, passed_result)
+    return True
+
+
+class CheckGCD(_RSABatchGCDCheck):
   """Runs GCD checks among artifacts."""
 
   def __init__(self):
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_CRITICAL)
 
-  def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
-    any_weak = False
-    vals = [gmpy.mpz(util.Bytes2Int(key.rsa_info.n)) for key in artifacts]
-    gcds = rsa_util.BatchGCD(vals)
+  @property
+  def _subtract_one(self) -> bool:
+    return False
 
-    for i in range(len(gcds)):
-      test_result = self._CreateTestResult()
-      key = artifacts[i]
-      if gcds[i] != 1:
-        logging.warning("GCD check failed! GCD: %x\n%s", gcds[i], key.rsa_info)
-        factors = [gcds[i], gmpy.mpz(util.Bytes2Int(key.rsa_info.n)) // gcds[i]]
-        util.AttachFactors(key.test_info, consts.INFO_NAME_N_FACTORS, factors)
-        any_weak = True
-        test_result.result = True
-      util.SetTestResult(key.test_info, test_result)
-    return any_weak
+  @property
+  def _min_gcd_bytes(self) -> bytes:
+    return b"\x02"
+
+  def _RecordWeakKey(self, key: paranoid_pb2.RSAKey, gcd_val: int) -> None:
+    logging.warning("GCD check failed! GCD: %x\n%s", gcd_val, key.rsa_info)
+    factors = [gcd_val, gmpy.mpz(util.Bytes2Int(key.rsa_info.n)) // gcd_val]
+    util.AttachFactors(key.test_info, consts.INFO_NAME_N_FACTORS, factors)
 
 
-class CheckGCDN1(base_check.RSAKeyCheck):
+class CheckGCDN1(_RSABatchGCDCheck):
   """Runs GCD n-1 checks among artifacts.
 
   This test finds pairs of key with moduli n1 and n2 that have the property
@@ -91,21 +150,16 @@ class CheckGCDN1(base_check.RSAKeyCheck):
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_UNKNOWN)
     self._gcd_bound = gcd_bound
 
-  def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
-    any_weak = False
-    vals = [gmpy.mpz(util.Bytes2Int(key.rsa_info.n)) - 1 for key in artifacts]
-    # gcds[i] is the GCD of n-1 a key with the product of n-1 of all other keys.
-    gcds = rsa_util.BatchGCD(vals)
-    for i, key in enumerate(artifacts):
-      test_result = self._CreateTestResult()
-      if gcds[i] >= self._gcd_bound:
-        logging.warning(
-            "GCD N-1 check failed! GCD: %x\n%s", gcds[i], key.rsa_info
-        )
-        util.AttachFactors(
-            key.test_info, consts.INFO_NAME_NM1_FACTORS, [gcds[i]]
-        )
-        any_weak = True
-        test_result.result = True
-      util.SetTestResult(key.test_info, test_result)
-    return any_weak
+  @property
+  def _subtract_one(self) -> bool:
+    return True
+
+  @property
+  def _min_gcd_bytes(self) -> bytes:
+    if self._gcd_bound <= 0:
+      return b""
+    return util.Int2Bytes(self._gcd_bound)
+
+  def _RecordWeakKey(self, key: paranoid_pb2.RSAKey, gcd_val: int) -> None:
+    logging.warning("GCD N-1 check failed! GCD: %x\n%s", gcd_val, key.rsa_info)
+    util.AttachFactors(key.test_info, consts.INFO_NAME_NM1_FACTORS, [gcd_val])
