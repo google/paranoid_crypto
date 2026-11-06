@@ -325,5 +325,55 @@ TEST(RsaBatchTest, SubtractOneFilteredGcdsAndMalformedModulusSafety) {
   EXPECT_EQ(acc.num_unique_leaves(), 0u);
 }
 
+TEST(RsaBatchTest, RepeatedMultithreadedAlternatingConcurrencyStress) {
+  std::mt19937_64 rng(0xA17E24ULL);
+  constexpr size_t kNumItems = 45;
+  std::vector<std::pair<bool, std::string>> inputs;
+  inputs.reserve(kNumItems);
+
+  mpz_t shared_p, p, q, n;
+  mpz_inits(shared_p, p, q, n, nullptr);
+  mpz_set_ui(shared_p, 1000000007ULL);
+  mpz_nextprime(shared_p, shared_p);
+
+  for (size_t i = 0; i < kNumItems; ++i) {
+    if (i % 11 == 0) {
+      mpz_set(p, shared_p);
+    } else {
+      uint64_t seed_p = (rng() | (1ULL << 63)) | 1ULL;
+      mpz_import(p, sizeof(seed_p), 1, 1, 0, 0, &seed_p);
+      mpz_nextprime(p, p);
+    }
+    uint64_t seed_q = (rng() | (1ULL << 63)) | 1ULL;
+    mpz_import(q, sizeof(seed_q), 1, 1, 0, 0, &seed_q);
+    mpz_nextprime(q, q);
+    mpz_mul(n, p, q);
+    inputs.emplace_back(false, MpzToBe(n));
+  }
+  const std::string other_prod_be = MpzToBe(shared_p);
+  mpz_clears(shared_p, p, q, n, nullptr);
+
+  const std::vector<std::string> expected =
+      ReferenceBatchGcd(inputs, other_prod_be);
+
+  // Small chunk/superchunk thresholds with 8 worker threads force consecutive
+  // ParallelFor dispatches to alternate between partial worker participation
+  // (e.g., 2, 3, or 6 upper-tree pairs) and full 8-thread leaf passes.
+  RsaBatchOptions opts;
+  opts.chunk_target_bytes = 64;
+  opts.chunks_per_superchunk = 3;
+  opts.num_threads = 8;
+
+  for (int iter = 0; iter < 64; ++iter) {
+    RsaBatchAccumulator acc(opts);
+    acc.Reserve(inputs.size());
+    for (const auto& [neg, be] : inputs) {
+      acc.AddSignedBigEndian(neg, be);
+    }
+    ASSERT_EQ(acc.ComputeAllGcds(other_prod_be), expected)
+        << "at iteration " << iter;
+  }
+}
+
 }  // namespace
 }  // namespace paranoid_crypto::lib::cc_util
