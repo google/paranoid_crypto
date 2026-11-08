@@ -89,6 +89,8 @@ def Cr50U2fGuesses(
   guesses = set()
   if n.bit_length() % 32 != 0:
     return guesses  # Not implemented
+  if r1 % n == 0 or s1 % n == 0 or r2 % n == 0 or s2 % n == 0:
+    return guesses
   # This function tries to find x, k1, k2 such that:
   #   s1 * k1 == z1 + r1 * x (mod n),
   #   s2 * k2 == z2 + r2 * x (mod n),

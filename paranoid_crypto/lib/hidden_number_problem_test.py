@@ -13,6 +13,7 @@
 # limitations under the License.
 """Test for paranoid_crypto.lib.hidden_number_problem."""
 
+import random
 from typing import Optional, TypedDict
 from absl.testing import absltest
 from paranoid_crypto import paranoid_pb2
@@ -36,8 +37,7 @@ class EcdsaSample(TypedDict, total=False):
 
 
 # Sample with ECDSA signatures where the 8 most significant bits of k are 0.
-# Bias.COMMON_PREFIX needs 36-39 signatures to find the private key.
-# All other strategies fail.
+# Both Bias.MSB and Bias.COMMON_PREFIX find the private key from 40 signatures.
 SAMPLE_SECP256R1_8: EcdsaSample = {
     "curve":
         paranoid_pb2.CurveType.CURVE_SECP256R1,
@@ -7626,6 +7626,366 @@ SAMPLE_SECP256R1_JAVA_UTIL_RANDOM_SUBSET: EcdsaSample = {
     }]
 }
 
+SAMPLE_SECP384R1_JAVA_UTIL_RANDOM: EcdsaSample = {
+    "curve": paranoid_pb2.CurveType.CURVE_SECP384R1,
+    "priv": int(
+        "93d0067356b0b7517ee249b136ca8dfe3118efb227343815"
+        "13eb1c72b6f0d86d4a96219806eadf74e6a835f79cd27ee5",
+        16,
+    ),
+    "normalized": False,
+    "signatures": [
+        {
+            "r": int(
+                "ffd8798ccae257622b587153f394dc648b37781cd101a7da"
+                "ff9b86d4af8dab9e2ea838b8247382bf3cfa419d12e7326e",
+                16,
+            ),
+            "s": int(
+                "d976a7d600fd039624e197fc0a994ff6f677e16ce502d362"
+                "eb195fb73a191ec8f395610a9b13f229aaa3731c2e20e099",
+                16,
+            ),
+            "digest": (
+                "7962f9e9b27a7b861623151bf8f302511aa7f845a0413314"
+                "c9eb6a174ff917b6ba1b038504b9641d08621bb06d818021"
+            ),
+        },
+        {
+            "r": int(
+                "5cc26ad0c7c394039cab8619eb864d8d159ef84b5d5cb47c"
+                "2d6400c14d5afa5f12a573f9e02ca84581b40824f62a7a01",
+                16,
+            ),
+            "s": int(
+                "b7caf798d29cca918bce68ccc25e8141c1fa15ed93a6e8aa"
+                "09af07867775fe35d5a851680778326bd1fc0e76651c9caa",
+                16,
+            ),
+            "digest": (
+                "90d049162f12065ae25221c0035446f04650fa92893e7ca3"
+                "ef6922df8c13fd29e7fd65a87c96496efbd5304ed730d671"
+            ),
+        },
+        {
+            "r": int(
+                "dac947a9a13607a55081ffa317954cf5004b582aff7a8638"
+                "2e39ca8504377113770ef587a6214733480006a136667aed",
+                16,
+            ),
+            "s": int(
+                "d82567a3127309bd7496a63940a4c76cc4f907f7267cd360"
+                "cc4bf172d46cfcee64239bc8a0018fd3f472831a2ff01b60",
+                16,
+            ),
+            "digest": (
+                "6127ff2a93b8e5953a1d1d108a0e347a06c16b1bcc0e9441"
+                "b4e28551b17526651323412e9cbbb252be6d798595517c2a"
+            ),
+        },
+        {
+            "r": int(
+                "eac9e22f21863d95f4546265db312ae38337cc48ceda6978"
+                "87ca7868b789149af151b0fcfb5529eb4afab01de9b2b553",
+                16,
+            ),
+            "s": int(
+                "f7bd6db684b61e69f684ab63bd54f2ed4d214e73f7c21b05"
+                "724e603a42488db211b7557cc73d39756891f508350bfc4e",
+                16,
+            ),
+            "digest": (
+                "3ca383b7d97e9c9ebddcd3b589e82985c0ca6df62f79c384"
+                "787028c0d1bc0e3bd4d7cd0437dc1b7f8b3976c5521b9fae"
+            ),
+        },
+        {
+            "r": int(
+                "f8764c15acaf3f06bb50d0f22e19c47cff0583e088799c2f"
+                "024728ef8c14d43c4b5650d2e4d9275178dae1e6182fac19",
+                16,
+            ),
+            "s": int(
+                "065de2e759499ba6f61b45ec7aaffcb789d5a45aa440350c"
+                "1565897fb35dd984f0e84607d655ed9ef43b1e352b840e0b",
+                16,
+            ),
+            "digest": (
+                "18b7a45d91487deff55b5d5f8ac3c0f0ed059a4879925610"
+                "c7850ecdf177201cbeb122e9c694e2415d82b36408829124"
+            ),
+        },
+        {
+            "r": int(
+                "35bd7a3afa806eb04f6347a08548444d3a7780dd0bddb4ed"
+                "b325355abe3e980ecf0cd5fcd3a2fed80ff528be63173d45",
+                16,
+            ),
+            "s": int(
+                "7a01f6ab80f18cf1fc5e23e8b2c17d992b290b3354341227"
+                "8dc0bdde39b0c50564b07d2c370560d695eca26da1170a96",
+                16,
+            ),
+            "digest": (
+                "80304a880146f2f4ec3602ba42576cc0175599bedbecc63b"
+                "1f0de3b85468d4a0b3da6b530197878d8761c497261ba37c"
+            ),
+        },
+        {
+            "r": int(
+                "827603d37af349679f87a8b549362fabf7dde8b97b436ed0"
+                "efb114ec05ff6ff3a64f6f39f35b9f1ef7e080beffa8e127",
+                16,
+            ),
+            "s": int(
+                "87d7ebce983c28aa444b662bbc4c55490e512373629aa916"
+                "362747ab5f0aa3721da33f55d07018c40358a643687c7592",
+                16,
+            ),
+            "digest": (
+                "d3d8e14b3fa8dc1deb24fed3277a659a12fa0dabdab6c08e"
+                "924373107e5753f494a12599f7030b9e00e08c64f3a3d317"
+            ),
+        },
+        {
+            "r": int(
+                "f287c729d4524b7983a3811922a8443f8cff82d668538061"
+                "0f9f5d4dc23a6e7ac531005b15e8e06e964059bd3d361224",
+                16,
+            ),
+            "s": int(
+                "f371073e035910c1eea5c7b11f170afccee54a8b002750db"
+                "edd67f573f1c2339ce3d9101cc60c3efe894a04632256312",
+                16,
+            ),
+            "digest": (
+                "356fb91d2327284fe8d530f208583fd0cfea0da15537103e"
+                "d925ea5e0bdb13e831afa7b73c55333143880c849c376af4"
+            ),
+        },
+        {
+            "r": int(
+                "4408fba73b8f6921d2d78ccec7b642c665185c7dec33a1c3"
+                "f48a26e0dde75e15a9af525d524120ff0b2cb667b224a9f5",
+                16,
+            ),
+            "s": int(
+                "55c2148ce6e2d0c790cc1dd0704afe1ea6f63bc6c568be07"
+                "9a9343f3a632bfed3e7c64e15ff87d65930e1f89e8ede9b4",
+                16,
+            ),
+            "digest": (
+                "2af11cd35e2af82c52329cd923aaa6238166fb0cf26988cb"
+                "d438a34859c2bcd3a6539fba67053097eff0076f2e757d9b"
+            ),
+        },
+        {
+            "r": int(
+                "38e5bf2990b95805a5537dd22627f142aa4208f99e3bc82f"
+                "df3fb2a66d7160c817423a5597cac1ccca8fe13e9eda9461",
+                16,
+            ),
+            "s": int(
+                "c39d11e5c2c612bafcaa5e925187d9d4f5c42509c4a443c2"
+                "57fa01fde4414d27033330575804148e3a8feec8fb7b71e1",
+                16,
+            ),
+            "digest": (
+                "9b50518631280695395e89873567f699108f366cb43c671d"
+                "0be403533218bfaaa368d5dcb5b4cbc7804e425165d5f22f"
+            ),
+        },
+        {
+            "r": int(
+                "1dec5b9e9d72246e25ed62d8a9886d4babbf61d11c8a5707"
+                "30401135801860d61e67e9fc537c891b2edaa940aa773b6c",
+                16,
+            ),
+            "s": int(
+                "00d8331cbce3d2a3af6655dae7f0a64adab1be44c6151737"
+                "67961552d1341e37257495a74b5903761143fff7e4f8d1bc",
+                16,
+            ),
+            "digest": (
+                "e523fc1aa5d63219e970a08aff24df9977a979ee6ce8dc52"
+                "59391050b791ba50551e359a09b58230d966c75289d3bcbd"
+            ),
+        },
+        {
+            "r": int(
+                "2a0ef6518b0b15fac330aa9115b8f608de636d0e7ba8e611"
+                "224527e95ac4675104a975cdc8efad3c5288dea21f363c7e",
+                16,
+            ),
+            "s": int(
+                "3dabf82090445aa87ed61f6fd6ba5161e4d5b1bea4ae012b"
+                "89fdb0d8f798b9639b26c093f4fffa09406a7eec56e4b4e7",
+                16,
+            ),
+            "digest": (
+                "662b82e860f9bf8f183f4b92e37b377f7ee88024e2bcf4aa"
+                "7661be66083caec6bc26db67b86b6b850a2bc2e65ec5b51a"
+            ),
+        },
+        {
+            "r": int(
+                "3464d6c57b3cfeeba5a06fb18ebbd640bcc35e6bf4c15c82"
+                "8e0b66c0444e3192ad85bad8b7a1ee2ff9a3bd14de91efbc",
+                16,
+            ),
+            "s": int(
+                "dc680533744d7feba66284d1cf4f997b3b816f606f79e9b3"
+                "2844fd88f61bdb6f9a8f6d237b9d304741ce4dd84e9b7479",
+                16,
+            ),
+            "digest": (
+                "8df08626bba8e20e8f633f9c78c20e6b364802a47f134442"
+                "63983b3c3d001790f50737aeae97e97e0d6535d9b49b183f"
+            ),
+        },
+        {
+            "r": int(
+                "10601612c878c614789ed7d86a43b2e663542d3815d055d7"
+                "6317fe3fa50c89039597f8acfb4612ff0166af6d9a3a83c5",
+                16,
+            ),
+            "s": int(
+                "523da669a5c2229ea46dc40847e67565fbdb4723c1874a30"
+                "793fa4a9faf780d8631c7085ad4031d2be159319ef75b08d",
+                16,
+            ),
+            "digest": (
+                "085304f27567fadc62a9fbf656517e9552ad432268fa85bb"
+                "1ba6acf899f7c554ff72365a44c36582b1c22396878c0776"
+            ),
+        },
+        {
+            "r": int(
+                "303db4aa8b48bb8e1a9fcfb3e01ddcb1d2560b00eeed4fa0"
+                "3608214d1fcd5e24f6c8132853ec9e3f718fd0899262041f",
+                16,
+            ),
+            "s": int(
+                "cf34cf0998d80b390441a2fdf3cece3c5722e8637cef28d3"
+                "c567ce8e402cfbf571ff23fff6a321e1933e0f64f3a27b0d",
+                16,
+            ),
+            "digest": (
+                "c25dfbc707883e0892f8132284c99adf28f6963f1d8dc2ea"
+                "2277ea8e6c6eabcdfc77dfb415d3a31241ae15c42ab00cb8"
+            ),
+        },
+        {
+            "r": int(
+                "3a5a6c4ca6ba690bb3b7f5eb028072c4a923ac7b97de9800"
+                "f07327e2b124d2ffdf1d522254d115f9825af2d8b19806e0",
+                16,
+            ),
+            "s": int(
+                "9ebfd53cb066db76bd560f64101aeb3fbba322f9d88a0f1b"
+                "f8446f8bea1a08552aa52c4e9d064bf4bacbe3c01a61b238",
+                16,
+            ),
+            "digest": (
+                "b23c96f5e0bbe06292477b9dabadb7eeccaaadeee9558148"
+                "dc5f1f945ad3a0fe47c3bcc4e9ea8c5449477be1948b0767"
+            ),
+        },
+    ],
+}
+
+SAMPLE_SECP384R1_JAVA_UTIL_RANDOM_SUBSET: EcdsaSample = {
+    "curve": paranoid_pb2.CurveType.CURVE_SECP384R1,
+    "priv": int(
+        "93d0067356b0b7517ee249b136ca8dfe3118efb227343815"
+        "13eb1c72b6f0d86d4a96219806eadf74e6a835f79cd27ee5",
+        16,
+    ),
+    "normalized": False,
+    "signatures": [
+        {
+            "r": int(
+                "dcd2a553f5f763f4efb0352773a370505589cb2fd6f07aa9"
+                "0d88a3306e09edc6522cf7ddb68593d8feb5e79fcf4d243a",
+                16,
+            ),
+            "s": int(
+                "2b3179f87ba955e4f373ef6d02d30c1e17ba3571ee8e7cda"
+                "e2d0f5dfb34cc31074692d86529a343504a41944ed3cd9f1",
+                16,
+            ),
+            "digest": (
+                "5064e26aaaa7dc6faea57ed773f0b579c9cda2237d1f03a2"
+                "655ee5c6f1bed4779321254b2febad87705f2d072fa1ccd2"
+            ),
+        },
+        {
+            "r": int(
+                "9b1f7d1679ca959026a974c94dbf568f39c78f05ea45bc5d"
+                "51ade6b47e28a87ede858968c57d52ea09856798c6af2b2e",
+                16,
+            ),
+            "s": int(
+                "9911bb29e06c7c99037e4c08c3dd20b1b032bdd80e1f948c"
+                "4ba20f7c319c0c3b679bea9e19aab0759d8ae6a26d0becbb",
+                16,
+            ),
+            "digest": (
+                "c89ff60550f643cced25297306ebd14c5ac47812ecae266f"
+                "7a19272972f80349ce38cb07d0b1d17d508763fac7b42f06"
+            ),
+        },
+        {
+            "r": int(
+                "acb03c7195d7f31738a917df70012543870f4cc957277ab9"
+                "39be8a519a49b6a8f14eaa59ca19be1a2c53e7f6528a4e19",
+                16,
+            ),
+            "s": int(
+                "d6c01872cd4291dde181b69933d4409b42bd7de094e5fe0d"
+                "d4e84a6753c3dbdf04373f041161b0acfc6306bea5d8ebdc",
+                16,
+            ),
+            "digest": (
+                "c6ce2f0d1b09df4f2aa72ba151c922c442b6d00e1ed0afd2"
+                "fc6ce9159c229efd9a0594c6b9817cd64ccd6e26d4dc77fb"
+            ),
+        },
+        {
+            "r": int(
+                "f240aa0f65115677633f2cd53d29962856e1276f0aff3f39"
+                "8159bc269865ae0a2ad07aa3f5b1fa1f630a21b0d3b561d8",
+                16,
+            ),
+            "s": int(
+                "17acb110c8d00c17d650323f64ed62178d02525af019e9e7"
+                "413596941b7ad2eb666660d0779ed67f7c60ee945c8f62e5",
+                16,
+            ),
+            "digest": (
+                "2a6d458fd5fe90784b0fab016009eaa91725537b1684cfbf"
+                "4b4e3de793da61ee48ffd4dbfd8184e5feb1138c3b885fb7"
+            ),
+        },
+        {
+            "r": int(
+                "3c899c345888f90caf7e50bc203638eaf3ea4d373eb54e45"
+                "2ced965d226675f960466927c46125e6039b146a924204ef",
+                16,
+            ),
+            "s": int(
+                "488a686c0e2ee478ab722727114840d72950e7693b14b854"
+                "d963fac147bc2c96eecc8aa337da329d653afcc104acd6ca",
+                16,
+            ),
+            "digest": (
+                "dd3402f5e26fe69510fd07652d9c7a475644095ff4bc589a"
+                "acb8f2532a834e03d031c7f3e21617230fe0df0501b53795"
+            ),
+        },
+    ],
+}
+
 
 class HiddenNumberProblemTest(absltest.TestCase):
 
@@ -7679,6 +8039,51 @@ class HiddenNumberProblemTest(absltest.TestCase):
   def testSecp256r1Msb8(self):
     self.CheckSample(SAMPLE_SECP256R1_8,
                      hidden_number_problem.Bias.COMMON_PREFIX, None)
+
+  def testSecp256r1Msb8Direct(self):
+    self.CheckSample(SAMPLE_SECP256R1_8, hidden_number_problem.Bias.MSB, None)
+
+  def testSecp521r1PuttyMsb9(self):
+    curve = self.GetCurve(paranoid_pb2.CurveType.CURVE_SECP521R1)
+    rng = random.Random(202431497)
+    priv = rng.randrange(1, curve.n)
+    a, b = [], []
+    for _ in range(80):
+      k = rng.randrange(1, 1 << 512)
+      rx, _ = curve.Multiply(curve.g, k)
+      assert rx is not None
+      r = int(rx) % curve.n
+      z = rng.randrange(1, curve.n)
+      s = (int(ec_util.gmpy.invert(k, curve.n)) * (z + r * priv)) % curve.n
+      ai, bi = curve.HiddenNumberParams(r, s, z)
+      a.append(ai)
+      b.append(bi)
+    guesses = hidden_number_problem.HiddenNumberProblem(
+        a, b, None, curve.n, hidden_number_problem.Bias.MSB
+    )
+    self.assertContainsSubset([priv], guesses)
+
+  def testSecp256k1NormalizedMsb(self):
+    curve = self.GetCurve(paranoid_pb2.CurveType.CURVE_SECP256K1)
+    rng = random.Random(202601)
+    priv = rng.randrange(1, curve.n)
+    a, b = [], []
+    for _ in range(22):
+      k = rng.randrange(1, curve.n >> 16)
+      rx, _ = curve.Multiply(curve.g, k)
+      assert rx is not None
+      r = int(rx) % curve.n
+      z = rng.randrange(1, curve.n)
+      s = (int(ec_util.gmpy.invert(k, curve.n)) * (z + r * priv)) % curve.n
+      if s > curve.n // 2:
+        s = curve.n - s
+      ai, bi = curve.HiddenNumberParams(r, s, z)
+      a.append(ai)
+      b.append(bi)
+    guesses = hidden_number_problem.HiddenNumberProblem(
+        a, b, None, curve.n, hidden_number_problem.Bias.MSB
+    )
+    self.assertContainsSubset([priv], guesses)
 
   def testSecp256r1SameMsb8(self):
     self.CheckSample(SAMPLE_SECP256R1_WITH_OFFSET_8,
@@ -7937,6 +8342,21 @@ class HiddenNumberProblemTest(absltest.TestCase):
     self.CheckLcgSampleSubset(SAMPLE_SECP256R1_JAVA_UTIL_RANDOM_SUBSET,
                               hidden_number_problem.SearchStrategy.DEFAULT,
                               None)
+
+  def testSecp384r1JavaUtilRandomPrecomputation(self):
+    self.CheckLcgSample(
+        SAMPLE_SECP384R1_JAVA_UTIL_RANDOM,
+        lcg_constants.LcgName.JAVA_UTIL_RANDOM,
+        2,
+        4,
+    )
+
+  def testSecp384r1JavaUtilRandomNoParams(self):
+    self.CheckLcgSampleSubset(
+        SAMPLE_SECP384R1_JAVA_UTIL_RANDOM_SUBSET,
+        hidden_number_problem.SearchStrategy.DEFAULT,
+        None,
+    )
 
 
 if __name__ == "__main__":

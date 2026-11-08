@@ -27,6 +27,7 @@ a hidden number problem above, because it simplifies analyzing ECDSA signatures.
 
 from collections.abc import Iterator
 import enum
+import math
 from typing import Optional
 
 import gmpy2 as gmpy
@@ -86,6 +87,20 @@ class SearchStrategy(enum.Flag):
   INCLUDE_KEY = 4
 
   DEFAULT = SINGLE | SLIDING | INCLUDE_KEY
+
+
+def _MsbBiasBits(n_bits: int, num_sigs: int, delta0: float) -> int:
+  """Estimates the minimum detectable MSB zero-bias bits for centered HNP."""
+  m = max(1, num_sigs)
+  d = m + 2
+  gh_sq = max(1.0, d / (2.0 * math.pi * math.e))
+  norm_vs_gh = 0.5 * math.log2((0.25 + (m + 1) / 12.0) / gh_sq)
+  raw = (
+      (n_bits + 1.0) / m
+      + (d * d / m) * math.log2(delta0)
+      + (d / m) * norm_vs_gh
+  )
+  return max(3, min(n_bits - 2, math.ceil(raw)))
 
 
 def GetLattice(
@@ -156,7 +171,9 @@ def GetLattice(
   # LCGs, the Cr50 weakness, hidden subset sum problems, integers with
   # fixed parts.
   if w is None:
-    if bias == Bias.MSB or bias == Bias.COMMON_PREFIX:
+    if bias == Bias.MSB:
+      w = 1 << _MsbBiasBits(n.bit_length(), len(a), 1.0219)
+    elif bias == Bias.COMMON_PREFIX:
       # A good choice is to select w to match approximately as large as
       # the bias of the inputs.
       if len(a) < 4:
@@ -170,7 +187,7 @@ def GetLattice(
     elif bias == Bias.COMMON_POSTFIX:
       # Estimates the smallest number of bits that be detected with the
       # given number of signatures.
-      bits = max(3, int(n.bit_length() / len(a) * 1.25))
+      bits = max(3, int(n.bit_length() / max(1, len(a)) * 1.25))
       w = 2**bits
     elif bias == Bias.GENERALIZED:
       # The results of the experiments did not differ a lot:
@@ -198,7 +215,7 @@ def GetLattice(
   for j in range(2, lat_size):
     lat[j][j] = n * w
   if bias == Bias.MSB:
-    pass
+    lat[0][0] = n + 1
   elif bias == Bias.COMMON_PREFIX:
     for j in range(2, lat_size):
       lat[2][j] = w
@@ -209,6 +226,39 @@ def GetLattice(
   else:
     raise ValueError("Bias not implemented:" + str(bias))
   return lat
+
+
+def _SolveCenteredMsb(
+    a: list[int],
+    b: list[int],
+    w_val: int,
+    n: int,
+    use_bkz: bool = False,
+) -> set[int]:
+  """Solves a midpoint-centered MSB hidden number problem."""
+  half_n = max(1, n // 2)
+  half_bound = n // (2 * w_val)
+  a_centered = [(ai + bi * half_n - half_bound) % n for ai, bi in zip(a, b)]
+  lat_size = len(a) + 2
+  lat = [[0] * lat_size for _ in range(lat_size)]
+  lat[0] = [half_n, 0] + [v * w_val for v in a_centered]
+  lat[1] = [0, 1] + [v * w_val for v in b]
+  for j in range(2, lat_size):
+    lat[j][j] = n * w_val
+  res = (
+      lll.reduce_bkz(lat, block_size=16, max_loops=3)
+      if use_bkz
+      else lll.reduce(lat)
+  )
+  guesses = set()
+  for v in res:
+    if v[0] != 0:
+      r = v[0] // half_n
+      if r % n != 0:
+        inverse = int(gmpy.invert(r % n, n))
+        guess = (half_n + v[1] * inverse) % n
+        guesses.add(int(guess))
+  return guesses
 
 
 def HiddenNumberProblem(
@@ -231,6 +281,8 @@ def HiddenNumberProblem(
   Returns:
     a list of guesses for x
   """
+  if not a:
+    return []
   lat = GetLattice(a, b, w, n, bias=bias)
   res = lll.reduce(lat)
   guesses = set()
@@ -239,6 +291,16 @@ def HiddenNumberProblem(
       inverse = int(gmpy.invert(v[0], n))
       guess = (v[1] * inverse) % n
       guesses.add(int(guess))
+  if bias == Bias.MSB:
+    w_lll = (
+        w
+        if w is not None
+        else (1 << _MsbBiasBits(n.bit_length(), len(a), 1.0219))
+    )
+    guesses.update(_SolveCenteredMsb(a, b, w_lll, n, use_bkz=False))
+    if w is None and len(a) >= 36:
+      w_bkz = 1 << _MsbBiasBits(n.bit_length(), len(a), 1.0138)
+      guesses.update(_SolveCenteredMsb(a, b, w_bkz, n, use_bkz=True))
   return list(guesses)
 
 
@@ -287,7 +349,8 @@ def HiddenNumberProblemWithPrecomputation(
   """
   lattice_size = len(a) * len(constants) + 2
   lattice = [[0] * lattice_size for _ in range(lattice_size)]
-  lattice[0][0] = n * w + 1
+  use_unit_lead = n.bit_length() >= 384 and len(a) * len(constants) >= 80
+  lattice[0][0] = n + 1 if use_unit_lead else n * w + 1
   lattice[1][1] = 1
   for i in range(len(a)):
     for j, (c, d) in enumerate(constants):
@@ -295,7 +358,23 @@ def HiddenNumberProblemWithPrecomputation(
       lattice[0][t] = (a[i] * c - d) % n * w
       lattice[1][t] = (b[i] * c % n) * w
       lattice[t][t] = n * w
-  reduced = lll.reduce(lattice)
+  if use_unit_lead:
+    short_norm_sq = (lattice_size - 2) * ((n * w) // 64) ** 2
+
+    def _FoundTarget(basis: list[list[int]]) -> bool:
+      for row in basis:
+        if (
+            abs(row[0]) == n + 1
+            and sum(x * x for x in row[2:]) < short_norm_sq
+        ):
+          return True
+      return False
+
+    reduced = lll.reduce_bkz(
+        lattice, block_size=28, max_loops=5, stop_fn=_FoundTarget
+    )
+  else:
+    reduced = lll.reduce(lattice)
   guesses = set()
   for v in reduced:
     if v[0] % n != 0:

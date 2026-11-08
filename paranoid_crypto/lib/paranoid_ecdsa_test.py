@@ -14,8 +14,10 @@
 """ECDSA Tests for paranoid_crypto.lib.paranoid."""
 
 import copy
+import random
 from absl.testing import absltest
 from paranoid_crypto import paranoid_pb2
+from paranoid_crypto.lib import consts
 from paranoid_crypto.lib import ec_util
 from paranoid_crypto.lib import paranoid
 from paranoid_crypto.lib import paranoid_base_test
@@ -637,6 +639,123 @@ class ParanoidECDSATest(paranoid_base_test.ParanoidBaseTest):
     self.assertFalse(paranoid.CheckAllECDSASigs(good_ecdsa_sigs))
     for ecdsa_check_name in paranoid.GetECDSAAllChecks():
       self.assertResults(good_ecdsa_sigs, ecdsa_check_name, False)
+
+  def testDegenerateSignaturesDoNotCrash(self):
+    curve = ec_util.CURVE_FACTORY[paranoid_pb2.CurveType.CURVE_SECP256R1]
+    assert curve is not None
+    degenerate_sigs = []
+    for r_val, s_val in (
+        (0, 0),
+        (1, 0),
+        (0, 1),
+        (curve.n, curve.n),
+        (curve.n, 1),
+        (1, curve.n),
+    ):
+      sig = copy.deepcopy(good_ecdsa_secp256r1)
+      sig.ecdsa_sig_info.r = util.Int2Bytes(r_val)
+      sig.ecdsa_sig_info.s = util.Int2Bytes(s_val)
+      degenerate_sigs.append(sig)
+    self.assertFalse(paranoid.CheckAllECDSASigs(degenerate_sigs))
+    for ecdsa_check_name in paranoid.GetECDSAAllChecks():
+      self.assertResults(degenerate_sigs, ecdsa_check_name, False)
+
+    # Interleaving a degenerate (0, 0) signature between two Cr50 U2F signatures
+    # of the same issuer must still recover the private key.
+    zero_between = copy.deepcopy(bad_ecdsa_cr50u2f_2)
+    zero_between.ecdsa_sig_info.r = b'\x00'
+    zero_between.ecdsa_sig_info.s = b'\x00'
+    interleaved = [
+        copy.deepcopy(bad_ecdsa_cr50u2f_2),
+        zero_between,
+        copy.deepcopy(bad_ecdsa_cr50u2f_3),
+    ]
+    u2f_check = ecdsa_sig_checks.CheckCr50U2f()
+    self.assertTrue(u2f_check.Check(interleaved))
+    self.assertResults(interleaved, u2f_check.check_name, True)
+
+  def testCheckNonceMSBSecp521r1Putty(self):
+    curve = ec_util.CURVE_FACTORY[paranoid_pb2.CurveType.CURVE_SECP521R1]
+    assert curve is not None
+    rng = random.Random(202431497)
+    priv = rng.randrange(1, curve.n)
+    pub_x, pub_y = curve.Multiply(curve.g, priv)
+    assert pub_x is not None and pub_y is not None
+    putty_sigs = []
+    for _ in range(80):
+      k = rng.randrange(1, 1 << 512)
+      rx, _ = curve.Multiply(curve.g, k)
+      assert rx is not None
+      r = int(rx) % curve.n
+      z = rng.randrange(1, curve.n)
+      s = (int(ec_util.gmpy.invert(k, curve.n)) * (z + r * priv)) % curve.n
+      sig = paranoid_pb2.ECDSASignature()
+      sig.ecdsa_sig_info.algorithm = (
+          paranoid_pb2.SignatureAlgorithm.ECDSA_WITH_SHA512
+      )
+      sig.ecdsa_sig_info.r = util.Int2Bytes(r)
+      sig.ecdsa_sig_info.s = util.Int2Bytes(s)
+      sig.ecdsa_sig_info.message_hash = int(z << 7).to_bytes(66, 'big')[:64]
+      # Recompute s for exact TransformOrderLen(message_hash):
+      _, _, actual_z = ec_util.ECDSAValues(sig.ecdsa_sig_info, curve)
+      sig.ecdsa_sig_info.s = util.Int2Bytes(
+          (int(ec_util.gmpy.invert(k, curve.n)) * (actual_z + r * priv))
+          % curve.n
+      )
+      sig.issuer_key_info.curve_type = paranoid_pb2.CurveType.CURVE_SECP521R1
+      sig.issuer_key_info.x = util.Int2Bytes(int(pub_x))
+      sig.issuer_key_info.y = util.Int2Bytes(int(pub_y))
+      putty_sigs.append(sig)
+    check = ecdsa_sig_checks.CheckNonceMSB()
+    self.assertTrue(check.Check(putty_sigs))
+    self.assertResults(putty_sigs, check.check_name, True)
+    info = util.GetAttachedInfo(
+        putty_sigs[0].test_info, consts.INFO_NAME_DISCRETE_LOG
+    )
+    self.assertIsNotNone(info)
+    assert info is not None
+    self.assertEqual(info.value, format(priv, 'x'))
+
+  def testCheckLCGNonceJavaUtilRandomSecp384r1(self):
+    pub_x = util.Hex2Bytes(
+        '26db84103dcdfe2fad425a4f92def6f9b9e48f90c08c37f9f92e2a6dec028fb671345764ea67af6d0baede6577cd68a1'
+    )
+    pub_y = util.Hex2Bytes(
+        '06aa1eef11ab0794b8285e355b159d372515c1a7c16c8371bd3d4e37f337bb05f1ffd0ff92639e62dd7ff2ad131e61a4'
+    )
+    raw_sigs = [
+        (
+            39378242585629154931879652839210853357963064548320104080130913114420145574530433766979414903680911516524398695101038,
+            33470695759134496166461273357666672294675458555923383623613187036702424455790311312395537583469264087126785914888345,
+            '7962f9e9b27a7b861623151bf8f302511aa7f845a0413314c9eb6a174ff917b6ba1b038504b9641d08621bb06d818021',
+        ),
+        (
+            14276984856523493234535743323441783286489759912407081164570414740216926040501014129345101514360282817824163849992705,
+            28288307193006860734053862766508363255390007978353835849156417101802949084850917578984641431767138557847030581730474,
+            '90d049162f12065ae25221c0035446f04650fa92893e7ca3ef6922df8c13fd29e7fd65a87c96496efbd5304ed730d671',
+        ),
+        (
+            33674285811461971193381409171082682959049962320547680651620422154240770172121322858173527703457837758977090666265325,
+            33267931519460148891114177737414541527229882643412058470505401281301078525187129595574328343251309058552062503033696,
+            '6127ff2a93b8e5953a1d1d108a0e347a06c16b1bcc0e9441b4e28551b17526651323412e9cbbb252be6d798595517c2a',
+        ),
+    ]
+    p384_sigs = []
+    for r_val, s_val, digest_hex in raw_sigs:
+      sig = paranoid_pb2.ECDSASignature()
+      sig.ecdsa_sig_info.algorithm = (
+          paranoid_pb2.SignatureAlgorithm.ECDSA_WITH_SHA384
+      )
+      sig.ecdsa_sig_info.r = util.Int2Bytes(r_val)
+      sig.ecdsa_sig_info.s = util.Int2Bytes(s_val)
+      sig.ecdsa_sig_info.message_hash = util.Hex2Bytes(digest_hex)
+      sig.issuer_key_info.curve_type = paranoid_pb2.CurveType.CURVE_SECP384R1
+      sig.issuer_key_info.x = pub_x
+      sig.issuer_key_info.y = pub_y
+      p384_sigs.append(sig)
+    check = ecdsa_sig_checks.CheckLCGNonceJavaUtilRandom()
+    self.assertTrue(check.Check(p384_sigs))
+    self.assertResults(p384_sigs, check.check_name, True)
 
 
 if __name__ == '__main__':

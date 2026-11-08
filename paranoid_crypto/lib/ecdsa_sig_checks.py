@@ -92,22 +92,31 @@ class BiasedBaseCheck(base_check.ECDSASignatureCheck):
       pks = _MapIssuerSigIndexes(sigs)
       guesses = set()
       for _, idxs in pks.items():
-        # Exclude duplicate signatures from the actual processing while
-        # preserving signature order for sliding-window checks.
+        # Exclude duplicate and degenerate (r == 0 or s == 0 mod n) signatures
+        # from the actual processing while preserving signature order for
+        # sliding-window checks.
+        vals = (
+            ec_util.ECDSAValues(sigs[idx].ecdsa_sig_info, curve)
+            for idx in idxs
+        )
         unique_vals = list(
             dict.fromkeys(
-                ec_util.ECDSAValues(sigs[idx].ecdsa_sig_info, curve)
-                for idx in idxs
+                (r, s, z)
+                for r, s, z in vals
+                if r % curve.n != 0 and s % curve.n != 0
             )
         )
+        if not unique_vals:
+          continue
         a, b = [0] * len(unique_vals), [0] * len(unique_vals)
         seen_r: dict[int, tuple[int, int]] = {}
         for i in range(len(unique_vals)):
           r, s, z = unique_vals[i]
           ai, bi = curve.HiddenNumberParams(r, s, z)
           a[i], b[i] = ai, bi
-          if r in seen_r:
-            a0, b0 = seen_r[r]
+          r_mod = int(r % curve.n)
+          if r_mod in seen_r:
+            a0, b0 = seen_r[r_mod]
             for da, db in ((ai - a0, bi - b0), (ai + a0, bi + b0)):
               db_mod = db % curve.n
               if db_mod != 0:
@@ -115,7 +124,7 @@ class BiasedBaseCheck(base_check.ECDSASignatureCheck):
                     int((-da * ec_util.gmpy.invert(db_mod, curve.n)) % curve.n)
                 )
           else:
-            seen_r[r] = (ai, bi)
+            seen_r[r_mod] = (ai, bi)
         if self.bias:
           # For general biases it makes sense to check with different sizes for
           # the sets of signatures. E.g., 24 to catch simple LCGs, 48 to catch
@@ -274,12 +283,18 @@ class CheckCr50U2f(base_check.ECDSASignatureCheck):
       pks = _MapIssuerSigIndexes(sigs)
       guesses = set()
       for _, idxs in pks.items():
-        # Exclude duplicate signatures from the actual processing while
-        # preserving signature order for the sliding window.
+        # Exclude duplicate and degenerate (r == 0 or s == 0 mod n) signatures
+        # from the actual processing while preserving signature order for the
+        # sliding window.
+        vals = (
+            ec_util.ECDSAValues(sigs[idx].ecdsa_sig_info, curve)
+            for idx in idxs
+        )
         unique_vals = list(
             dict.fromkeys(
-                ec_util.ECDSAValues(sigs[idx].ecdsa_sig_info, curve)
-                for idx in idxs
+                (r, s, z)
+                for r, s, z in vals
+                if r % curve.n != 0 and s % curve.n != 0
             )
         )
         # Sliding window. Two signatures are enough to detect this vulnerability
