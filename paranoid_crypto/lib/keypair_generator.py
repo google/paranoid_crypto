@@ -53,7 +53,14 @@ class Generator:
 
     Returns:
       The generated prime.
+
+    Raises:
+      ValueError: If p_size_bits is less than 64 or not a multiple of 8.
     """
+    if p_size_bits < 64 or p_size_bits % 8 != 0:
+      raise ValueError(
+          f'p_size_bits must be a multiple of 8 and >= 64, got {p_size_bits}'
+      )
     p_size_bytes = p_size_bits // 8
     while True:
       prime_bytes = b''
@@ -91,7 +98,12 @@ class Generator:
 
     Returns:
       a tuple containing the two primes of the RSA key/modulus.
+
+    Raises:
+      ValueError: If bits is less than 128 or not a multiple of 16.
     """
+    if bits < 128 or bits % 16 != 0:
+      raise ValueError(f'bits must be a multiple of 16 and >= 128, got {bits}')
     p_size_bits = bits // 2
     p = self.generate_prime(p_size_bits)
     q = self.generate_prime(p_size_bits)

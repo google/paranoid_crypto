@@ -600,6 +600,11 @@ class CheckKeypairDenylist(base_check.RSAKeyCheck):
   for a detailed description of the vulnerability.
   """
 
+  _DEFAULT_KEY_SIZES = frozenset({2048, 3072, 4096})
+  _MIN_CUSTOM_KEY_SIZE = 1024
+  _MAX_CUSTOM_KEY_SIZE = 8192
+  _MAX_CACHE_ENTRIES = 4096
+
   def __init__(self, paranoid_storage: Optional[storage.Storage] = None):
     """CheckKeypairDenylist check constructor.
 
@@ -609,25 +614,58 @@ class CheckKeypairDenylist(base_check.RSAKeyCheck):
     """
     super().__init__(paranoid_pb2.SeverityType.SEVERITY_CRITICAL)
     self._storage = paranoid_storage or default_storage.DefaultStorage()
+    self._is_default_storage = isinstance(
+        self._storage, default_storage.DefaultStorage
+    )
     self._table = dict(self._storage.GetKeypairData().table)
+
+  def _IsSupportedKeySize(self, n_bits: int) -> bool:
+    if self._is_default_storage:
+      return n_bits in self._DEFAULT_KEY_SIZES
+    return (
+        self._MIN_CUSTOM_KEY_SIZE <= n_bits <= self._MAX_CUSTOM_KEY_SIZE
+        and n_bits % 16 == 0
+    )
 
   def Check(self, artifacts: list[paranoid_pb2.RSAKey]) -> bool:
     any_weak = False
+    generated_cache: dict[tuple[bytes, int], tuple[int, int]] = {}
     for key in artifacts:
       test_result = self._CreateTestResult()
       n = util.Bytes2Int(key.rsa_info.n)
-      n_msb = n >> (n.bit_length() - 64)
+      n_bits = n.bit_length()
+      if not self._IsSupportedKeySize(n_bits) or n % 2 == 0:
+        util.SetTestResult(key.test_info, test_result)
+        continue
+      n_msb = n >> (n_bits - 64)
       if n_msb in self._table:
         metadata = self._table[n_msb]
-        seed = bytearray([metadata[0]] + [0] * 31)
-        for i in range(1, len(metadata), 2):
-          seed[metadata[i]] = metadata[i + 1]
-        p, q = keypair_generator.Generator(seed).generate_key(n.bit_length())  # pyrefly: ignore[bad-argument-type]
-        if p * q == n:
-          logging.warning("Key factored! Factors: %s\n%s", (p, q), key.rsa_info)
-          util.AttachFactors(key.test_info, consts.INFO_NAME_N_FACTORS, (p, q))
-          any_weak = True
-          test_result.result = True
+        if (
+            len(metadata) >= 1
+            and len(metadata) % 2 == 1
+            and all(1 <= metadata[i] < 32 for i in range(1, len(metadata), 2))
+        ):
+          cache_key = (metadata, n_bits)
+          if cache_key in generated_cache:
+            p, q = generated_cache[cache_key]
+          else:
+            seed = bytearray([metadata[0]] + [0] * 31)
+            for i in range(1, len(metadata), 2):
+              seed[metadata[i]] = metadata[i + 1]
+            p, q = keypair_generator.Generator(bytes(seed)).generate_key(
+                n_bits
+            )
+            if len(generated_cache) < self._MAX_CACHE_ENTRIES:
+              generated_cache[cache_key] = (p, q)
+          if p * q == n:
+            logging.warning(
+                "Key factored! Factors: %s\n%s", (p, q), key.rsa_info
+            )
+            util.AttachFactors(
+                key.test_info, consts.INFO_NAME_N_FACTORS, (p, q)
+            )
+            any_weak = True
+            test_result.result = True
       util.SetTestResult(key.test_info, test_result)
     return any_weak
 

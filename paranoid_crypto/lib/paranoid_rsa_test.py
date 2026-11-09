@@ -13,11 +13,15 @@
 # limitations under the License.
 """RSA Tests for paranoid_crypto.lib.paranoid."""
 
+from collections.abc import Set
 from absl.testing import absltest
 from paranoid_crypto import paranoid_pb2
+from paranoid_crypto.lib import keypair_generator
 from paranoid_crypto.lib import paranoid
 from paranoid_crypto.lib import paranoid_base_test
 from paranoid_crypto.lib import util
+from paranoid_crypto.lib.data import data_pb2
+from paranoid_crypto.lib.data import storage
 from paranoid_crypto.lib.paranoid import rsa_aggregate_checks
 from paranoid_crypto.lib.paranoid import rsa_single_checks
 
@@ -450,6 +454,152 @@ class ParanoidRSATest(paranoid_base_test.ParanoidBaseTest):
     self.assertTrue(check.Check(bad_rsa_keys_keypair))
     self.assertResults(bad_rsa_keys_keypair, check.check_name, True)
     self.assertFactors(bad_rsa_keys_keypair)
+
+  def testCheckKeypairDenylistRejectsMalformedAndAttackerSizedModuli(self):
+    check = rsa_single_checks.CheckKeypairDenylist()
+    known_n = util.Bytes2Int(bad_rsa_keypair1.rsa_info.n)
+    known_msb = known_n >> (known_n.bit_length() - 64)
+
+    empty_key = paranoid_pb2.RSAKey(
+        rsa_info=paranoid_pb2.RSAKeyInfo(n=b'', e=b'\x01\x00\x01')
+    )
+    small_key = paranoid_pb2.RSAKey(
+        rsa_info=paranoid_pb2.RSAKeyInfo(
+            n=util.Int2Bytes(101 * 103), e=b'\x01\x00\x01'
+        )
+    )
+    odd_2049_key = paranoid_pb2.RSAKey(
+        rsa_info=paranoid_pb2.RSAKeyInfo(
+            n=util.Int2Bytes((known_msb << (2049 - 64)) | 1),
+            e=b'\x01\x00\x01',
+        )
+    )
+    non_aligned_2054_key = paranoid_pb2.RSAKey(
+        rsa_info=paranoid_pb2.RSAKeyInfo(
+            n=util.Int2Bytes((known_msb << (2054 - 64)) | 1),
+            e=b'\x01\x00\x01',
+        )
+    )
+    unlisted_8192_key = paranoid_pb2.RSAKey(
+        rsa_info=paranoid_pb2.RSAKeyInfo(
+            n=util.Int2Bytes((known_msb << (8192 - 64)) | 1),
+            e=b'\x01\x00\x01',
+        )
+    )
+    oversized_odd_key = paranoid_pb2.RSAKey(
+        rsa_info=paranoid_pb2.RSAKeyInfo(
+            n=util.Int2Bytes((known_msb << (100001 - 64)) | 1),
+            e=b'\x01\x00\x01',
+        )
+    )
+    even_composite_key = paranoid_pb2.RSAKey(
+        rsa_info=paranoid_pb2.RSAKeyInfo(
+            n=util.Int2Bytes(known_msb << (2048 - 64)),
+            e=b'\x01\x00\x01',
+        )
+    )
+
+    crafted_keys = [
+        empty_key,
+        small_key,
+        odd_2049_key,
+        non_aligned_2054_key,
+        unlisted_8192_key,
+        oversized_odd_key,
+        even_composite_key,
+    ]
+    self.assertFalse(check.Check(crafted_keys))
+    self.assertResults(crafted_keys, check.check_name, False)
+
+  def testCheckKeypairDenylistCustomStorageBoundsKeySizes(self):
+    seed_bytes = b'\x07\x00\x00\x05' + b'\x00' * 28
+    p_1024, q_1024 = keypair_generator.Generator(seed_bytes).generate_key(1024)
+    n_1024 = p_1024 * q_1024
+    msb_1024 = n_1024 >> (1024 - 64)
+
+    keypair_data = data_pb2.KeypairData()
+    keypair_data.table[msb_1024] = b'\x07\x03\x05'
+    keypair_data.table[0xFFFFFFFFFFFFFFFF] = b'\x01\x20\x02'
+
+    class _FakeStorage(storage.Storage):
+
+      def GetUnseededRands(self, size: int) -> Set[int]:
+        return frozenset()
+
+      def GetKeypairData(self) -> data_pb2.KeypairData:
+        return keypair_data
+
+      def GetOpensslDenylist(self) -> Set[str]:
+        return frozenset()
+
+      def GetOpensslDenylistEC(self) -> data_pb2.OpensslDenylistECData:
+        return data_pb2.OpensslDenylistECData()
+
+      def GetUnseededRandsEC(self) -> data_pb2.UnseededRandsECData:
+        return data_pb2.UnseededRandsECData()
+
+    check = rsa_single_checks.CheckKeypairDenylist(
+        paranoid_storage=_FakeStorage()
+    )
+    weak_1024_key = paranoid_pb2.RSAKey(
+        rsa_info=paranoid_pb2.RSAKeyInfo(
+            n=util.Int2Bytes(n_1024), e=b'\x01\x00\x01'
+        )
+    )
+    self.assertTrue(check.Check([weak_1024_key]))
+    self.assertResults([weak_1024_key], check.check_name, True)
+    self.assertFactors([weak_1024_key])
+
+    too_small_512 = paranoid_pb2.RSAKey(
+        rsa_info=paranoid_pb2.RSAKeyInfo(
+            n=util.Int2Bytes((msb_1024 << (512 - 64)) | 1), e=b'\x01\x00\x01'
+        )
+    )
+    odd_1025 = paranoid_pb2.RSAKey(
+        rsa_info=paranoid_pb2.RSAKeyInfo(
+            n=util.Int2Bytes((msb_1024 << (1025 - 64)) | 1), e=b'\x01\x00\x01'
+        )
+    )
+    non_aligned_1030 = paranoid_pb2.RSAKey(
+        rsa_info=paranoid_pb2.RSAKeyInfo(
+            n=util.Int2Bytes((msb_1024 << (1030 - 64)) | 1), e=b'\x01\x00\x01'
+        )
+    )
+    too_large_16384 = paranoid_pb2.RSAKey(
+        rsa_info=paranoid_pb2.RSAKeyInfo(
+            n=util.Int2Bytes((msb_1024 << (16384 - 64)) | 1), e=b'\x01\x00\x01'
+        )
+    )
+    malformed_metadata_key = paranoid_pb2.RSAKey(
+        rsa_info=paranoid_pb2.RSAKeyInfo(
+            n=util.Int2Bytes((0xFFFFFFFFFFFFFFFF << (1024 - 64)) | 1),
+            e=b'\x01\x00\x01',
+        )
+    )
+    rejected = [
+        too_small_512,
+        odd_1025,
+        non_aligned_1030,
+        too_large_16384,
+        malformed_metadata_key,
+    ]
+    self.assertFalse(check.Check(rejected))
+    self.assertResults(rejected, check.check_name, False)
+
+  def testKeypairGeneratorRejectsInvalidBitLengths(self):
+    gen = keypair_generator.Generator(b'\x00' * 32)
+    with self.assertRaises(ValueError):
+      gen.generate_prime(0)
+    with self.assertRaises(ValueError):
+      gen.generate_prime(56)
+    with self.assertRaises(ValueError):
+      gen.generate_prime(1025)
+    with self.assertRaises(ValueError):
+      gen.generate_key(64)
+    with self.assertRaises(ValueError):
+      gen.generate_key(2049)
+    with self.assertRaises(ValueError):
+      gen.generate_key(2054)
 
   def testCheckShortSleeve(self):
     check = rsa_single_checks.CheckShortSleeve()
