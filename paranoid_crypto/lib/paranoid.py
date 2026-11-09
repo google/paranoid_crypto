@@ -75,6 +75,8 @@ _ACTIVE_ECDSA_SIG_CHECKS = (
     ecdsa_sig_checks.CheckNonceGeneralized,
     ecdsa_sig_checks.CheckIssuerKey,
     ecdsa_sig_checks.CheckCr50U2f,
+    ecdsa_sig_checks.CheckOpensslDenylistECDSANonce,
+    ecdsa_sig_checks.CheckUnseededRandECDSANonce,
 )
 
 # Keys used in the check dictonary factory:

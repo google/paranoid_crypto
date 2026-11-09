@@ -14,7 +14,10 @@
 """ECDSA Tests for paranoid_crypto.lib.paranoid."""
 
 import copy
+import hashlib
+import hmac
 import random
+import struct
 from absl.testing import absltest
 from paranoid_crypto import paranoid_pb2
 from paranoid_crypto.lib import consts
@@ -22,6 +25,9 @@ from paranoid_crypto.lib import ec_util
 from paranoid_crypto.lib import paranoid
 from paranoid_crypto.lib import paranoid_base_test
 from paranoid_crypto.lib import util
+from paranoid_crypto.lib.data import data_pb2
+from paranoid_crypto.lib.data import debian_openssl_generator
+from paranoid_crypto.lib.data import storage
 from paranoid_crypto.lib.paranoid import ecdsa_sig_checks
 
 # Good ECDSA signatures.
@@ -756,6 +762,407 @@ class ParanoidECDSATest(paranoid_base_test.ParanoidBaseTest):
     check = ecdsa_sig_checks.CheckLCGNonceJavaUtilRandom()
     self.assertTrue(check.Check(p384_sigs))
     self.assertResults(p384_sigs, check.check_name, True)
+
+  def _SignWithNonce(
+      self,
+      curve_type: paranoid_pb2.CurveType,
+      priv_d: int,
+      nonce_k: int,
+      message_hash: bytes,
+      algorithm: paranoid_pb2.SignatureAlgorithm = (
+          paranoid_pb2.SignatureAlgorithm.ECDSA_WITH_SHA256
+      ),
+      normalize_low_s: bool = False,
+      untruncated_hash: bool = False,
+  ) -> paranoid_pb2.ECDSASignature:
+    curve = ec_util.CURVE_FACTORY[curve_type]
+    assert curve is not None
+    pub_x, pub_y = curve.Multiply(curve.g, priv_d)
+    rx, _ = curve.Multiply(curve.g, nonce_k)
+    assert pub_x is not None and pub_y is not None and rx is not None
+    n_int = int(curve.n)
+    r = int(rx) % n_int
+    assert r != 0
+    if untruncated_hash:
+      z = util.Bytes2Int(message_hash) % n_int
+    else:
+      z = int(
+          curve.TransformOrderLen(
+              ec_util.gmpy.mpz(util.Bytes2Int(message_hash)),
+              len(message_hash) * 8,
+          )
+      )
+    s = (int(ec_util.gmpy.invert(nonce_k, curve.n)) * (z + r * priv_d)) % n_int
+    assert s != 0
+    if normalize_low_s and s > n_int // 2:
+      s = n_int - s
+    sig = paranoid_pb2.ECDSASignature()
+    sig.ecdsa_sig_info.algorithm = algorithm
+    sig.ecdsa_sig_info.r = util.Int2Bytes(r)
+    sig.ecdsa_sig_info.s = util.Int2Bytes(s)
+    sig.ecdsa_sig_info.message_hash = message_hash
+    sig.issuer_key_info.curve_type = curve_type
+    sig.issuer_key_info.x = util.Int2Bytes(int(pub_x))
+    sig.issuer_key_info.y = util.Int2Bytes(int(pub_y))
+    return sig
+
+  def _AssertRecoveredSigDLogs(
+      self,
+      sigs: list[paranoid_pb2.ECDSASignature],
+      expected_dlogs: list[int],
+  ) -> None:
+    self.assertLen(sigs, len(expected_dlogs))
+    for sig, expected_d in zip(sigs, expected_dlogs):
+      curve = ec_util.CURVE_FACTORY[sig.issuer_key_info.curve_type]
+      assert curve is not None
+      info = util.GetAttachedInfo(sig.test_info, consts.INFO_NAME_DISCRETE_LOG)
+      self.assertIsNotNone(info)
+      assert info is not None
+      recovered_d = int(info.value, 16)
+      self.assertEqual(recovered_d, expected_d)
+      self.assertEqual(
+          curve.Multiply(curve.g, recovered_d),
+          ec_util.PublicPoint(sig.issuer_key_info),
+      )
+
+  def testCheckOpensslDenylistECDSANonce(self):
+    check = ecdsa_sig_checks.CheckOpensslDenylistECDSANonce()
+    openssl_curves = (
+        (
+            paranoid_pb2.CurveType.CURVE_SECP256R1,
+            paranoid_pb2.SignatureAlgorithm.ECDSA_WITH_SHA256,
+            hashlib.sha256,
+        ),
+        (
+            paranoid_pb2.CurveType.CURVE_SECP384R1,
+            paranoid_pb2.SignatureAlgorithm.ECDSA_WITH_SHA384,
+            hashlib.sha384,
+        ),
+        (
+            paranoid_pb2.CurveType.CURVE_SECP521R1,
+            paranoid_pb2.SignatureAlgorithm.ECDSA_WITH_SHA512,
+            hashlib.sha512,
+        ),
+    )
+    rng = random.Random(20080166)
+    weak_sigs = []
+    expected_dlogs = []
+    # Cover all 3 default NIST prime curves, all 12 architecture/seeding
+    # configs, boundary PIDs, low-s normalization, and negated nonces n - k,
+    # using strong random issuer keys that CheckIssuerKey cannot flag.
+    for idx in range(len(debian_openssl_generator.CONFIGS)):
+      curve_type, algo, hash_fn = openssl_curves[idx % len(openssl_curves)]
+      curve = ec_util.CURVE_FACTORY[curve_type]
+      assert curve is not None
+      for pid in (0, 1, 12345, 32767) if idx < 3 else (42,):
+        priv_d = rng.randrange(1 << (curve.n.bit_length() - 2), int(curve.n))
+        k = debian_openssl_generator.generate_ec_private_key(
+            idx, pid, int(curve.n)
+        )
+        if idx % 4 == 3:
+          k = int(curve.n) - k
+        msg_hash = hash_fn(f'openssl-{idx}-{pid}'.encode('ascii')).digest()
+        sig = self._SignWithNonce(
+            curve_type,
+            priv_d,
+            k,
+            msg_hash,
+            algorithm=algo,
+            normalize_low_s=(idx % 2 == 1),
+        )
+        weak_sigs.append(sig)
+        expected_dlogs.append(priv_d)
+
+    # Confirm CheckIssuerKey does not flag strong issuer keys.
+    issuer_check = ecdsa_sig_checks.CheckIssuerKey()
+    self.assertFalse(issuer_check.Check(copy.deepcopy(weak_sigs[:3])))
+
+    self.assertTrue(check.Check(weak_sigs))
+    self.assertResults(weak_sigs, check.check_name, True)
+    self.assertSeverities(
+        weak_sigs,
+        check.check_name,
+        paranoid_pb2.SeverityType.SEVERITY_CRITICAL,
+    )
+    self._AssertRecoveredSigDLogs(weak_sigs, expected_dlogs)
+
+    # Mixed batch: an issuer with one normal signature and one CVE-2008-0166
+    # signature has both flagged with d attached, while an unrelated strong
+    # issuer in the same batch remains unflagged.
+    p256 = ec_util.CURVE_FACTORY[paranoid_pb2.CurveType.CURVE_SECP256R1]
+    assert p256 is not None
+    compromised_d = rng.randrange(1 << 254, int(p256.n))
+    strong_nonce = rng.randrange(1 << 254, int(p256.n))
+    debian_nonce = debian_openssl_generator.generate_ec_private_key(
+        5, 999, int(p256.n)
+    )
+    sig_normal_same_issuer = self._SignWithNonce(
+        paranoid_pb2.CurveType.CURVE_SECP256R1,
+        compromised_d,
+        strong_nonce,
+        hashlib.sha256(b'normal-nonce-msg').digest(),
+    )
+    sig_weak_same_issuer = self._SignWithNonce(
+        paranoid_pb2.CurveType.CURVE_SECP256R1,
+        compromised_d,
+        debian_nonce,
+        hashlib.sha256(b'debian-nonce-msg').digest(),
+    )
+    unrelated_good = copy.deepcopy(good_ecdsa_secp256r1)
+    mixed = [sig_normal_same_issuer, sig_weak_same_issuer, unrelated_good]
+    self.assertTrue(check.Check(mixed))
+    self.assertResults(mixed[:2], check.check_name, True)
+    self.assertResults([unrelated_good], check.check_name, False)
+    self._AssertRecoveredSigDLogs(mixed[:2], [compromised_d, compromised_d])
+
+    # Zero-FP verification: both a 32-bit r-suffix collision and an exact
+    # denylisted r paired with an invalid s for a strong issuer must not be
+    # flagged.
+    rx_deny, _ = p256.Multiply(p256.g, debian_nonce)
+    assert rx_deny is not None
+    r_deny = int(rx_deny) % int(p256.n)
+    colliding_r_sig = copy.deepcopy(good_ecdsa_secp256r1)
+    colliding_r_sig.ecdsa_sig_info.r = util.Int2Bytes(r_deny ^ (1 << 40))
+    forged_exact_r_sig = copy.deepcopy(good_ecdsa_secp256r1)
+    forged_exact_r_sig.ecdsa_sig_info.r = util.Int2Bytes(r_deny)
+    non_weak = [
+        colliding_r_sig,
+        forged_exact_r_sig,
+        copy.deepcopy(bad_ecdsa_secp256k1_diff1),
+    ]
+    self.assertFalse(check.Check(non_weak))
+    self.assertResults(non_weak, check.check_name, False)
+
+  def testCheckUnseededRandECDSANonce(self):
+    check = ecdsa_sig_checks.CheckUnseededRandECDSANonce()
+    p256 = ec_util.CURVE_FACTORY[paranoid_pb2.CurveType.CURVE_SECP256R1]
+    p384 = ec_util.CURVE_FACTORY[paranoid_pb2.CurveType.CURVE_SECP384R1]
+    p521 = ec_util.CURVE_FACTORY[paranoid_pb2.CurveType.CURVE_SECP521R1]
+    assert p256 is not None and p384 is not None and p521 is not None
+
+    rng = random.Random(202339910)
+
+    # 1. GMP unseeded mpz_urandomb(256) and Java java.util.Random(0).
+    k_gmp_p256 = int(
+        '6580d17dd84a873b14b9c0e1680bbdc87647f3c382902d2f58d2754b39bca874', 16
+    ) % int(p256.n)
+
+    java_seed = 0 ^ 0x5DEECE66D
+    java_bytes = bytearray()
+    for _ in range(8):
+      java_seed = (java_seed * 0x5DEECE66D + 0xB) & ((1 << 48) - 1)
+      rnd_int = java_seed >> 16
+      for _ in range(4):
+        java_bytes.append(rnd_int & 0xFF)
+        rnd_int >>= 8
+    k_java_p256 = util.Bytes2Int(bytes(java_bytes)) % int(p256.n)
+
+    # 2. Python random.Random(0) randrange(1, n) on secp384r1.
+    py_rng = random.Random()
+    py_rng.seed(0, version=2)
+    k_py_p384 = py_rng.randrange(1, int(p384.n))
+
+    # 3. C++11 default-constructed std::mt19937 (seed 5489).
+    mt = [0] * 624
+    mt[0] = 5489
+    for i in range(1, 624):
+      mt[i] = (1812433253 * (mt[i - 1] ^ (mt[i - 1] >> 30)) + i) & 0xFFFFFFFF
+    for i in range(624):
+      y = (mt[i] & 0x80000000) | (mt[(i + 1) % 624] & 0x7FFFFFFF)
+      mt[i] = mt[(i + 397) % 624] ^ (y >> 1)
+      if y & 1:
+        mt[i] ^= 0x9908B0DF
+    k_cpp = 0
+    for i in range(8):
+      y = mt[i]
+      y ^= y >> 11
+      y ^= (y << 7) & 0x9D2C5680
+      y ^= (y << 15) & 0xEFC60000
+      y ^= y >> 18
+      k_cpp = (k_cpp << 32) | (y & 0xFFFFFFFF)
+    k_cpp_p256 = k_cpp % int(p256.n)
+
+    # 4. Zero/empty/placeholder deterministic nonce derivations across curves,
+    # including low-s normalization and untruncated SHA-512 on P-256.
+    cases = [
+        (
+            paranoid_pb2.CurveType.CURVE_SECP256R1,
+            p256,
+            k_gmp_p256,
+            False,
+            False,
+        ),
+        (
+            paranoid_pb2.CurveType.CURVE_SECP256R1,
+            p256,
+            k_java_p256,
+            True,
+            False,
+        ),
+        (paranoid_pb2.CurveType.CURVE_SECP384R1, p384, k_py_p384, True, False),
+        (
+            paranoid_pb2.CurveType.CURVE_SECP256R1,
+            p256,
+            k_cpp_p256,
+            False,
+            False,
+        ),
+        (
+            paranoid_pb2.CurveType.CURVE_SECP256R1,
+            p256,
+            util.Bytes2Int(hashlib.sha256(b'').digest()) % int(p256.n),
+            False,
+            True,
+        ),
+        (
+            paranoid_pb2.CurveType.CURVE_SECP256R1,
+            p256,
+            util.Bytes2Int(hashlib.sha256(b'\x00' * 32).digest()) % int(p256.n),
+            True,
+            False,
+        ),
+        (
+            paranoid_pb2.CurveType.CURVE_SECP384R1,
+            p384,
+            util.Bytes2Int(hashlib.sha384(b'\x00' * 48).digest()) % int(p384.n),
+            False,
+            False,
+        ),
+        (
+            paranoid_pb2.CurveType.CURVE_SECP521R1,
+            p521,
+            util.Bytes2Int(hashlib.sha512(b'\x00' * 64).digest()) % int(p521.n),
+            True,
+            False,
+        ),
+        (
+            paranoid_pb2.CurveType.CURVE_SECP521R1,
+            p521,
+            util.Bytes2Int(hashlib.shake_256(b'').digest(66)) % int(p521.n),
+            False,
+            False,
+        ),
+        (
+            paranoid_pb2.CurveType.CURVE_SECP256R1,
+            p256,
+            util.Bytes2Int(
+                hmac.new(
+                    b'Nist256p1 seed', b'\x00' * 32, hashlib.sha512
+                ).digest()[:32]
+            )
+            % int(p256.n),
+            False,
+            False,
+        ),
+        (
+            paranoid_pb2.CurveType.CURVE_SECP256R1,
+            p256,
+            util.Bytes2Int(b'\x42' * 32) % int(p256.n),
+            False,
+            False,
+        ),
+    ]
+
+    weak_sigs = []
+    expected_dlogs = []
+    for i, (curve_type, curve, nonce_k, low_s, untrunc) in enumerate(cases):
+      priv_d = rng.randrange(1 << (curve.n.bit_length() - 2), int(curve.n))
+      msg_hash = hashlib.sha512(f'unseeded-{i}'.encode('ascii')).digest()
+      sig = self._SignWithNonce(
+          curve_type,
+          priv_d,
+          nonce_k,
+          msg_hash,
+          algorithm=paranoid_pb2.SignatureAlgorithm.ECDSA_WITH_SHA512,
+          normalize_low_s=low_s,
+          untruncated_hash=untrunc,
+      )
+      weak_sigs.append(sig)
+      expected_dlogs.append(priv_d)
+
+    self.assertTrue(check.Check(weak_sigs))
+    self.assertResults(weak_sigs, check.check_name, True)
+    self.assertSeverities(
+        weak_sigs,
+        check.check_name,
+        paranoid_pb2.SeverityType.SEVERITY_CRITICAL,
+    )
+    self._AssertRecoveredSigDLogs(weak_sigs, expected_dlogs)
+
+    # Zero-FP verification: 64-bit r-suffix collision and exact-r forgery with
+    # invalid s must not be flagged.
+    r_weak = util.Bytes2Int(weak_sigs[0].ecdsa_sig_info.r)
+    colliding_r64 = copy.deepcopy(good_ecdsa_secp256r1)
+    colliding_r64.ecdsa_sig_info.r = util.Int2Bytes(r_weak ^ (1 << 80))
+    forged_exact_r = copy.deepcopy(good_ecdsa_secp256r1)
+    forged_exact_r.ecdsa_sig_info.r = util.Int2Bytes(r_weak)
+    non_weak = [colliding_r64, forged_exact_r]
+    self.assertFalse(check.Check(non_weak))
+    self.assertResults(non_weak, check.check_name, False)
+
+  def testCustomStorageInjectionForNonceChecks(self):
+    secp256k1 = ec_util.CURVE_FACTORY[paranoid_pb2.CurveType.CURVE_SECP256K1]
+    assert secp256k1 is not None
+    n_int = int(secp256k1.n)
+    k_openssl = debian_openssl_generator.generate_ec_private_key(2, 777, n_int)
+    kx_ossl, _ = secp256k1.Multiply(secp256k1.g, k_openssl)
+    assert kx_ossl is not None
+    meta = (2 << 15) | 777
+
+    openssl_data = data_pb2.OpensslDenylistECData()
+    tbl = openssl_data.curve_tables[int(paranoid_pb2.CurveType.CURVE_SECP256K1)]
+    tbl.x_lsb32 = struct.pack('<I', int(kx_ossl) & 0xFFFFFFFF)
+    tbl.meta_hi = bytes([meta >> 16])
+    tbl.meta_lo = struct.pack('<H', meta & 0xFFFF)
+
+    k_unseeded = 0x123456789ABCDEF0123456789ABCDEF0
+    kx_uns, _ = secp256k1.Multiply(secp256k1.g, k_unseeded)
+    assert kx_uns is not None
+    unseeded_data = data_pb2.UnseededRandsECData()
+    unseeded_data.curve_tables[
+        int(paranoid_pb2.CurveType.CURVE_SECP256K1)
+    ].x_lsb64_to_d[int(kx_uns) & 0xFFFFFFFFFFFFFFFF] = k_unseeded.to_bytes(
+        32, 'big'
+    )
+
+    class _FakeStorage(storage.Storage):
+
+      def GetUnseededRands(self, size: int):
+        return frozenset()
+
+      def GetKeypairData(self) -> data_pb2.KeypairData:
+        return data_pb2.KeypairData()
+
+      def GetOpensslDenylist(self):
+        return frozenset()
+
+      def GetOpensslDenylistEC(self) -> data_pb2.OpensslDenylistECData:
+        return openssl_data
+
+      def GetUnseededRandsEC(self) -> data_pb2.UnseededRandsECData:
+        return unseeded_data
+
+    fake_storage = _FakeStorage()
+    rng = random.Random(42)
+    d1 = rng.randrange(1 << 254, n_int)
+    d2 = rng.randrange(1 << 254, n_int)
+    sig_ossl = self._SignWithNonce(
+        paranoid_pb2.CurveType.CURVE_SECP256K1,
+        d1,
+        k_openssl,
+        hashlib.sha256(b'custom-ossl').digest(),
+    )
+    sig_uns = self._SignWithNonce(
+        paranoid_pb2.CurveType.CURVE_SECP256K1,
+        d2,
+        k_unseeded,
+        hashlib.sha256(b'custom-unseeded').digest(),
+    )
+    ossl_check = ecdsa_sig_checks.CheckOpensslDenylistECDSANonce(fake_storage)
+    uns_check = ecdsa_sig_checks.CheckUnseededRandECDSANonce(fake_storage)
+    self.assertTrue(ossl_check.Check([sig_ossl]))
+    self.assertTrue(uns_check.Check([sig_uns]))
+    self._AssertRecoveredSigDLogs([sig_ossl, sig_uns], [d1, d2])
 
 
 if __name__ == '__main__':

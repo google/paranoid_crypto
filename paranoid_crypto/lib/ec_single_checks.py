@@ -186,12 +186,12 @@ class CheckOpensslDenylistEC(base_check.ECKeyCheck):
       self._custom_tables = None
       self._GetTables()
     else:
-      self._custom_tables = self._ParseTables(
+      self._custom_tables = self.ParseTables(
           paranoid_storage.GetOpensslDenylistEC()
       )
 
   @classmethod
-  def _ParseTables(
+  def ParseTables(
       cls, proto_data: data_pb2.OpensslDenylistECData
   ) -> dict[int, tuple[array.array[int], bytes, array.array[int]]]:
     tables: dict[int, tuple[array.array[int], bytes, array.array[int]]] = {}
@@ -215,16 +215,28 @@ class CheckOpensslDenylistEC(base_check.ECKeyCheck):
       tables[int(curve_id)] = (xs, meta_hi, meta_lo)
     return tables
 
+  @classmethod
+  def _ParseTables(
+      cls, proto_data: data_pb2.OpensslDenylistECData
+  ) -> dict[int, tuple[array.array[int], bytes, array.array[int]]]:
+    return cls.ParseTables(proto_data)
+
+  @classmethod
+  def GetDefaultTables(
+      cls,
+  ) -> dict[int, tuple[array.array[int], bytes, array.array[int]]]:
+    if cls._DEFAULT_TABLES is None:
+      cls._DEFAULT_TABLES = cls.ParseTables(
+          default_storage.DefaultStorage().GetOpensslDenylistEC()
+      )
+    return cls._DEFAULT_TABLES
+
   def _GetTables(
       self,
   ) -> dict[int, tuple[array.array[int], bytes, array.array[int]]]:
     if self._custom_tables is not None:
       return self._custom_tables
-    if CheckOpensslDenylistEC._DEFAULT_TABLES is None:
-      CheckOpensslDenylistEC._DEFAULT_TABLES = self._ParseTables(
-          default_storage.DefaultStorage().GetOpensslDenylistEC()
-      )
-    return CheckOpensslDenylistEC._DEFAULT_TABLES
+    return self.GetDefaultTables()
 
   def Check(self, artifacts: list[paranoid_pb2.ECKey]) -> bool:
     any_weak = False
@@ -303,12 +315,12 @@ class CheckUnseededRandEC(base_check.ECKeyCheck):
       self._custom_tables = None
       self._GetTables()
     else:
-      self._custom_tables = self._ParseTables(
+      self._custom_tables = self.ParseTables(
           paranoid_storage.GetUnseededRandsEC()
       )
 
   @classmethod
-  def _ParseTables(
+  def ParseTables(
       cls, proto_data: data_pb2.UnseededRandsECData
   ) -> dict[int, dict[int, bytes]]:
     tables: dict[int, dict[int, bytes]] = {}
@@ -316,14 +328,34 @@ class CheckUnseededRandEC(base_check.ECKeyCheck):
       tables[int(curve_id)] = dict(curve_table.x_lsb64_to_d)
     return tables
 
+  @classmethod
+  def _ParseTables(
+      cls, proto_data: data_pb2.UnseededRandsECData
+  ) -> dict[int, dict[int, bytes]]:
+    return cls.ParseTables(proto_data)
+
+  @classmethod
+  def GetDefaultTables(cls) -> dict[int, dict[int, bytes]]:
+    if cls._DEFAULT_TABLES is None:
+      cls._DEFAULT_TABLES = cls.ParseTables(
+          default_storage.DefaultStorage().GetUnseededRandsEC()
+      )
+    return cls._DEFAULT_TABLES
+
+  @staticmethod
+  def UnpackCandidates(d_bytes: bytes, order: int) -> list[int]:
+    d_len = (int(order).bit_length() + 7) // 8
+    if len(d_bytes) >= d_len and len(d_bytes) % d_len == 0:
+      return [
+          util.Bytes2Int(d_bytes[i : i + d_len])
+          for i in range(0, len(d_bytes), d_len)
+      ]
+    return [util.Bytes2Int(d_bytes)]
+
   def _GetTables(self) -> dict[int, dict[int, bytes]]:
     if self._custom_tables is not None:
       return self._custom_tables
-    if CheckUnseededRandEC._DEFAULT_TABLES is None:
-      CheckUnseededRandEC._DEFAULT_TABLES = self._ParseTables(
-          default_storage.DefaultStorage().GetUnseededRandsEC()
-      )
-    return CheckUnseededRandEC._DEFAULT_TABLES
+    return self.GetDefaultTables()
 
   def Check(self, artifacts: list[paranoid_pb2.ECKey]) -> bool:
     any_weak = False
@@ -343,14 +375,7 @@ class CheckUnseededRandEC(base_check.ECKeyCheck):
         x_lsb64 = int(point[0]) & 0xFFFFFFFFFFFFFFFF
         d_bytes = curve_map.get(x_lsb64)
         if d_bytes:
-          d_len = (int(curve.n).bit_length() + 7) // 8
-          if len(d_bytes) >= d_len and len(d_bytes) % d_len == 0:
-            candidates = [
-                util.Bytes2Int(d_bytes[i : i + d_len])
-                for i in range(0, len(d_bytes), d_len)
-            ]
-          else:
-            candidates = [util.Bytes2Int(d_bytes)]
+          candidates = self.UnpackCandidates(d_bytes, int(curve.n))
           for d in candidates:
             if 1 <= d < curve.n and curve.Multiply(curve.g, d) == point:
               discrete_log = format(int(d), "x")
